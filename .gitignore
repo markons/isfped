@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.pyspf_recent_files.json
+.venv/
+.idea/
+.vscode/
