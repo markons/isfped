@@ -29,6 +29,8 @@ FIELD_WIDTH = 6
 EXCLUDED_FIELD = "- - - "
 LABEL_MARK = "lbl."     # Tk mark per label: lbl.NAME
 EXCLUDE_MARK = "xcl."   # Tk mark per excluded line: xcl.<n>
+TEMP_MARK = "tmp."      # Tk mark per temporary inserted line (I, TS): tmp.<n>
+TEMP_FIELD = "'" * FIELD_WIDTH
 
 
 class ISPFEditor:
@@ -41,6 +43,8 @@ class ISPFEditor:
 
         # Editor state
         self.filename = None
+        self._final_newline = False  # the file's last line ends with a newline
+        self._at_top_of_data = False  # cursor still before line 1 (as after opening)
         self._dirty = False
         self._last_find = None
         self._last_change = None
@@ -63,6 +67,8 @@ class ISPFEditor:
         self._markers = []          # (Label widget, last line) for excluded blocks
         self._snapshots = {}        # hash(content) -> (labels, excluded), for undo/redo
         self._mark_seq = 0
+        self._rctrl_alone = False   # Right Ctrl pressed with no other key (= Enter)
+        self._insert_focus = None   # First line inserted by the last Enter (cursor goes there)
 
         self._build_ui()
         self._bind_keys()
@@ -176,7 +182,6 @@ class ISPFEditor:
 
         # Enter processes the line commands; typing overwrites like ISPF
         self.line_numbers.bind("<Return>", self.process_line_command)
-        self.line_numbers.bind("<KP_Enter>", self.process_line_command)
         self.line_numbers.bind("<Key>", self._gutter_overtype)
         self.line_numbers.bind("<BackSpace>", self._gutter_backspace)
         self.line_numbers.bind("<Delete>", self._gutter_delete)
@@ -247,13 +252,20 @@ class ISPFEditor:
 
     def _bind_keys(self):
         """Bind keyboard events."""
-        self.text.bind("<KeyRelease>", self.update_status)
+        self.text.bind("<KeyRelease>", self._text_key_release)
         # Keep gutter line count in sync with the text (pending commands are preserved)
         self.text.bind("<<Modified>>", self._on_text_modified)
         self.text.bind("<Configure>", self._on_text_configure)
-        # Enter in the text area runs pending line commands (otherwise a newline)
+        # Enter in the text area runs pending line commands (otherwise moves on, like NewLine)
         self.text.bind("<Return>", self._text_return)
-        self.text.bind("<KP_Enter>", self._text_return)
+        # The 3270 Enter key, as in SPFLite's keymap: Right Ctrl, keypad Enter and
+        # Shift/Ctrl/Alt+Enter always process the screen and never just move the cursor
+        for widget in (self.cmd_entry, self.line_numbers, self.text):
+            widget.bindtags(("RCtrlWatch",) + widget.bindtags())
+            widget.bind("<KeyRelease-Control_R>", self._right_ctrl_release)
+            for key in ("<KP_Enter>", "<Shift-Return>", "<Control-Return>", "<Alt-Return>"):
+                widget.bind(key, self._attention)
+        self.root.bind_class("RCtrlWatch", "<KeyPress>", self._watch_right_ctrl)
         # Ctrl+Z / Ctrl+Y: restore labels and excluded lines after the text is undone
         # (runs before Tk's own undo, so the page shown now can be kept)
         self.text.bind("<<Undo>>", self._on_undo_redo)
@@ -411,6 +423,31 @@ class ISPFEditor:
         for name, line in labels.items():
             self.text.mark_set(LABEL_MARK + name, f"{line}.0")
 
+    def get_temp_lines(self):
+        """Temporary inserted lines (I, TS): dropped on Enter if nothing was typed.
+
+        A mark that ended up mid-line (its line was joined to the one above)
+        no longer marks a line of its own.
+        """
+        lines = set()
+        for m in self.text.mark_names():
+            if m.startswith(TEMP_MARK):
+                line, col = self.text.index(m).split(".")
+                if col == "0":
+                    lines.add(int(line))
+        return lines
+
+    def set_temp_lines(self, lines):
+        for m in self.text.mark_names():
+            if m.startswith(TEMP_MARK):
+                self.text.mark_unset(m)
+        for line in lines:
+            self._mark_seq += 1
+            mark = f"{TEMP_MARK}{self._mark_seq}"
+            self.text.mark_set(mark, f"{line}.0")
+            # Left gravity: typing at the start of the line keeps the mark at column 0
+            self.text.mark_gravity(mark, tk.LEFT)
+
     def get_excluded(self):
         """Set of excluded (hidden) line numbers."""
         widget = self.text._w
@@ -482,6 +519,7 @@ class ISPFEditor:
         state = self._snapshots.get(hash(self.text.get("1.0", "end-1c")))
         if state:
             self._set_line_state(state)
+        self.set_temp_lines(())
         self.refresh_gutter()
         if view:
             self._set_view(view)
@@ -494,13 +532,17 @@ class ISPFEditor:
         self._snapshot()
 
     def _resolve_target(self, target):
-        """Line number for a LOCATE/FIND target: a number or a .label."""
+        """Line number for a LOCATE/FIND target: a number or a .label.
+
+        .n is a line-number pseudo label (SPFLite): line n, if it exists."""
         n = self._text_line_count()
         if target.isdigit():
             return max(1, min(int(target), n))
         name = target.upper().lstrip(".")
         if not target.startswith(".") or not name:
             return None
+        if name.isdigit():
+            return int(name) if 1 <= int(name) <= n else None
         if name in ("ZF", "ZFIRST"):
             return 1
         if name in ("ZL", "ZLAST"):
@@ -662,6 +704,7 @@ class ISPFEditor:
         for name, line in sorted(self.get_labels().items()):
             label_at.setdefault(line, name)
 
+        temp_lines = self.get_temp_lines()
         fields = []
         content_lines = self.text.get("1.0", "end-1c").split("\n")
         self.text.tag_remove("hexprefix", "1.0", tk.END)
@@ -677,6 +720,8 @@ class ISPFEditor:
                 fields.append(" " * FIELD_WIDTH)
             elif i in run_starts:
                 fields.append(EXCLUDED_FIELD)
+            elif i in temp_lines:
+                fields.append(TEMP_FIELD)
             elif i in label_at:
                 fields.append(f".{label_at[i]}".ljust(FIELD_WIDTH))
             else:
@@ -753,13 +798,45 @@ class ISPFEditor:
         self._update_ispf_header()
 
     def _text_return(self, event=None):
-        """Enter in the text area: run pending line commands like ISPF, else a newline."""
+        """Enter in the text area: run pending line commands like ISPF.
+
+        Never splits the line (as SPFLite's NewLine): with nothing to process
+        the cursor moves to the next line command field. On inserted lines it
+        moves to the next inserted line; on the last one it processes, which
+        drops the line if untouched or adds another if something was typed.
+        """
         if self._text_entry:
             self._finish_text_entry()
             return "break"
-        if self._get_pending_commands():
-            return self.process_line_command()
-        return None
+        line = self._current_line(self.text)
+        temp_lines = self.get_temp_lines()
+        if self._get_pending_commands() or (line in temp_lines and line + 1 not in temp_lines):
+            return self.process_line_command(event)
+        if line in temp_lines:
+            self._focus_text(line + 1)
+        else:
+            self._focus_gutter(self._next_row(self._row_of(line), 1))
+        return "break"
+
+    def _watch_right_ctrl(self, event):
+        self._rctrl_alone = event.keysym == "Control_R"
+
+    def _right_ctrl_release(self, event):
+        """Right Ctrl alone is Enter (Right Ctrl + another key stays a shortcut)."""
+        if not self._rctrl_alone:
+            return None
+        self._rctrl_alone = False
+        return self._attention(event)
+
+    def _attention(self, event):
+        """The 3270 Enter key: process commands; with nothing to do the cursor stays."""
+        if event.widget is self.cmd_entry:
+            self.process_primary_command(event, attention=True)
+        elif self._text_entry:
+            self._finish_text_entry()
+        else:
+            self.process_line_command(event, attention=True)
+        return "break"
 
     def _text_entry_default_count(self, line):
         """Approximate ISPF TE's default space-to-bottom on the visible page."""
@@ -909,6 +986,37 @@ class ISPFEditor:
             return "break"
         return None
 
+    @staticmethod
+    def _data_shift(line, amount, left):
+        """ISPF/SPFLite data shift (< and >): nonblank data is never lost.
+
+        A word starting in column 1 stays put; the text after it moves - up to
+        the next gap of two or more blanks. Shifting left stops one blank short
+        of the word before it (or of column 1); shifting right pushes the words
+        that follow only as far as needed to keep one blank between words.
+        """
+        words = [[m.start(), m.group()] for m in re.finditer(r"[^ ]+", line)]
+        first = 1 if line[:1] not in ("", " ") else 0
+        if first >= len(words):
+            return line
+        if left:
+            last = first + 1
+            while (last < len(words) and words[last][0]
+                   == words[last - 1][0] + len(words[last - 1][1]) + 1):
+                last += 1
+            floor = (words[first - 1][0] + len(words[first - 1][1]) + 1) if first else 1
+            step = min(amount, words[first][0] - floor)
+            for word in words[first:last]:
+                word[0] -= step
+        else:
+            words[first][0] += amount
+            for prev, word in zip(words[first:], words[first + 1:]):
+                word[0] = max(word[0], prev[0] + len(prev[1]) + 1)
+        out = ""
+        for start, word in words:
+            out += " " * (start - len(out)) + word
+        return out + line[len(line.rstrip(" ")):]
+
     def _get_pending_commands(self):
         """Commands typed in the gutter: {line_number: command}.
 
@@ -928,15 +1036,39 @@ class ISPFEditor:
                 pending[line] = "."
         return pending
 
-    def process_line_command(self, event=None):
-        """Process line commands typed directly on the gutter."""
+    def process_line_command(self, event=None, attention=False):
+        """Process line commands typed directly on the gutter.
+
+        attention: the 3270 Enter key - with nothing to process the cursor stays.
+        """
         if self._processing:
             return "break"
         self._processing = True
         try:
             commands = self._get_pending_commands()
-            if not commands:
-                if event is not None and event.widget is self.line_numbers:
+            temp_lines = self.get_temp_lines()
+            source = event.widget if event is not None else None
+            dropped_line = None
+            if source is self.text:
+                line = self._current_line(self.text)
+                if line in temp_lines and line not in commands:
+                    if self.text.get(f"{line}.0", f"{line}.end"):
+                        if line + 1 not in temp_lines:
+                            # Typed on the last inserted line: continue with another one
+                            commands[line] = "I"
+                    else:
+                        # Lands on the line that takes its place after the untouched
+                        # inserted lines above it are dropped too
+                        dropped_line = line - sum(
+                            1 for t in temp_lines
+                            if t < line and t not in commands
+                            and not self.text.get(f"{t}.0", f"{t}.end"))
+            # Only the Enter key drops untouched inserted lines; an empty Enter in
+            # the line command area just moves on (like NewLine)
+            if not commands and (not temp_lines or (source is self.line_numbers and not attention)):
+                if attention:
+                    return "break"
+                if source is self.line_numbers:
                     # Enter with nothing typed: move to the next line number
                     line = self._row_of(self._current_line(self.line_numbers))
                     self._focus_gutter(self._next_row(line, 1))
@@ -949,6 +1081,7 @@ class ISPFEditor:
                 return "break"
 
             self._cursor_line = None
+            self._insert_focus = None
             message, keep = self.apply_line_commands(commands)
             if message.startswith("Invalid line command"):
                 self._error_lines = {int(n) for n in re.findall(r"line (\d+):", message)} or set(commands)
@@ -963,9 +1096,15 @@ class ISPFEditor:
             self._place_markers()
             if self._text_entry:
                 self._focus_text(self._text_entry[0])
-            if self._cursor_line and not self._text_entry and event is not None and event.widget is self.line_numbers:
-                # Like an empty Enter, move on to the next line number (after I: the
-                # new line; if the cursor's line was deleted, the line now in its place)
+            elif self._insert_focus:
+                # Like ISPF: after I the cursor is on the first inserted line
+                self._focus_text(self._insert_focus)
+            elif dropped_line:
+                # The (untouched) inserted line under the cursor is gone
+                self._focus_gutter(dropped_line)
+            elif self._cursor_line and source is self.line_numbers:
+                # Like an empty Enter, move on to the next line number (if the
+                # cursor's line was deleted, the line now in its place)
                 line, kept = self._cursor_line
                 self._focus_gutter(self._next_row(self._row_of(line), 1) if kept else line)
             self.status.config(text=message)
@@ -1034,6 +1173,11 @@ class ISPFEditor:
                 else:
                     open_blocks[op] = (idx, cnt)
             elif op in ("D", "C", "M", "UC", "LC", "X", "HX"):
+                # Like SPFLite, a count must not run past the last line
+                # (except for X, which excludes to the bottom)
+                if op in ("D", "C", "M", "UC", "LC") and idx + cnt > n:
+                    return (f"Repeat value extends past the last line - "
+                            f"line {idx + 1}"), commands
                 end = min(idx + max(cnt, 1) - 1, n - 1)
                 ops.append((op, idx, max(end, block_end.get(idx, idx)), 1))
             elif op in ("TS", "TF", "TE"):
@@ -1043,9 +1187,12 @@ class ISPFEditor:
 
         if open_blocks:
             names = ", ".join(sorted(open_blocks))
+            # Like SPFLite: keep the block open and move on to the next line command
+            # field, so Enter walks down to where the closing command goes
+            self._cursor_line = (self._current_line(self.line_numbers), True)
             return f"Block command {names} incomplete - enter the matching pair", commands
 
-        if any(op in ("TS", "TF", "TE") for _, op, _, _ in ops) and len(ops) > 1:
+        if any(op in ("TS", "TF", "TE") for op, _, _, _ in ops) and len(ops) > 1:
             return "TS, TF and TE must be entered by themselves", commands
 
         sources = [o for o in ops if o[0] in ("C", "M")]
@@ -1067,7 +1214,10 @@ class ISPFEditor:
             return (f"{op} pending - enter A, B, or O destination", commands)
 
         # --- Apply -------------------------------------------------------
-        delete = set()
+        # Temporary inserted lines nobody typed on disappear, as in ISPF;
+        # typed ones become permanent. None in after[] = a new temporary line.
+        delete = {i - 1 for i in self.get_temp_lines()
+                  if i <= n and not lines[i - 1] and i not in commands}
         before, after = defaultdict(list), defaultdict(list)
         msgs = []
         for op, s, e, cnt in ops:
@@ -1076,7 +1226,7 @@ class ISPFEditor:
                 delete.update(rng)
                 msgs.append(f"Deleted {len(rng)} line(s)")
             elif op == "I":
-                after[e].extend([""] * max(cnt, 1))
+                after[e].extend([None] * max(cnt, 1))
                 msgs.append(f"Inserted {max(cnt, 1)} line(s)")
             elif op == "R":
                 after[e].extend(lines[s:e + 1] * max(cnt, 1))
@@ -1093,13 +1243,7 @@ class ISPFEditor:
             elif op in ("<", ">"):
                 amount = cnt or 2
                 for k in rng:
-                    if op == "<":
-                        # Data shifts remove indentation only, so nonblank data
-                        # is never discarded as it can be by a column shift.
-                        leading = len(lines[k]) - len(lines[k].lstrip(" "))
-                        lines[k] = lines[k][min(amount, leading):]
-                    else:
-                        lines[k] = " " * amount + lines[k]
+                    lines[k] = self._data_shift(lines[k], amount, op == "<")
                 msgs.append(f"Data shifted {len(rng)} line(s) {'left' if op == '<' else 'right'} {amount}")
             elif op == "HX":
                 for k in rng:
@@ -1117,7 +1261,7 @@ class ISPFEditor:
                              if int(cursor.split(".")[0]) == s + 1 else len(line))
                 split_col = min(split_col, len(line))
                 lines[s] = line[:split_col]
-                after[s].extend([""] * max(cnt, 1) + [line[split_col:]])
+                after[s].extend([None] * max(cnt, 1) + [line[split_col:]])
                 msgs.append(f"Split line {s + 1}; inserted {max(cnt, 1)} blank line(s)")
             elif op == "TF":
                 start_line = lines[s]
@@ -1216,13 +1360,16 @@ class ISPFEditor:
             else:
                 msgs.append("Label removed")
 
-        new_lines, remap = [], {}
+        new_lines, remap, new_temp = [], {}, []
         for i, line in enumerate(lines):
             new_lines.extend(before[i])
             if i not in delete:
                 remap[i] = len(new_lines)
                 new_lines.append(line)
-            new_lines.extend(after[i])
+            for added in after[i]:
+                if added is None:
+                    new_temp.append(len(new_lines) + 1)
+                new_lines.append(added or "")
 
         # Labels and excluded lines follow their lines; deleted lines drop them
         new_labels = {k: remap[v] + 1 for k, v in labels.items() if v in remap}
@@ -1236,13 +1383,15 @@ class ISPFEditor:
         kept = [remap[v] for v in range(cursor, n) if v in remap]
         self._cursor_line = (kept[0] + 1 if kept else len(new_lines), cursor in remap)
         self._commit_text("\n".join(new_lines), (new_labels, new_excluded))
+        self.set_temp_lines(new_temp)
+        self._insert_focus = new_temp[0] if new_temp else None
         text_entry_ops = [o for o in ops if o[0] == "TE"]
         if text_entry_ops:
             _, s, _, cnt = text_entry_ops[0]
             count = cnt or self._text_entry_default_count(s + 1)
             self._text_entry = (remap[s] + 2, count)
         self.text.yview(f"{new_top}.0")
-        return "; ".join(msgs + info) or "Line commands processed", {}
+        return "; ".join(msgs + info) or ("Line commands processed" if commands else ""), {}
 
     def _replace_text(self, content):
         """Replace the whole buffer as a single undo step, keeping the view."""
@@ -1255,6 +1404,8 @@ class ISPFEditor:
         self.text.delete("1.0", tk.END)
         self.text.insert("1.0", content)
         self.text.edit_separator()
+        # Lines rewritten as a whole are no longer temporary (apply_line_commands sets new ones)
+        self.set_temp_lines(())
         self.text.config(autoseparators=True)
         self.text.mark_set(tk.INSERT, insert)
         self.text.yview(top)
@@ -1262,28 +1413,39 @@ class ISPFEditor:
     # ------------------------------------------------------------------
     # Primary Commands
     # ------------------------------------------------------------------
-    def process_primary_command(self, event=None):
-        """Parse and execute a primary command from the command line."""
+    def process_primary_command(self, event=None, attention=False):
+        """Parse and execute a primary command from the command line.
+
+        attention: the 3270 Enter key - an empty command line keeps the cursor.
+        """
         cmd = self.cmd_entry.get().strip()
         parts = cmd.split()
         command = parts[0].upper() if parts else ""
         command = self.PRIMARY_ALIASES.get(command, command)
         args = parts[1:]
 
-        if cmd:
+        # RETRIEVE itself is not remembered, so it brings back the command before it
+        if cmd and command != "RETRIEVE":
             if not self._command_history or self._command_history[-1] != cmd:
                 self._command_history.append(cmd)
             self._history_index = len(self._command_history)
 
-        # Like ISPF, Enter also processes pending line commands (RESET discards them)
-        if command not in ("RES", "RESET") and self._get_pending_commands():
+        # Like ISPF, Enter also processes pending line commands and drops untouched
+        # inserted lines (RESET discards the commands; UNDO/REDO keep the inserted
+        # lines so they undo the I itself, not the clean-up)
+        self._insert_focus = None
+        if command not in ("RES", "RESET") and (
+                self._get_pending_commands()
+                or (self.get_temp_lines() and command not in ("UNDO", "REDO"))):
             self.process_line_command()
 
         self.cmd_entry.delete(0, tk.END)
         if not cmd:
             # Empty command line: Enter jumps to the first line number on the page
-            self._focus_gutter(self._first_row_on_page())
-            return
+            # (unless I put the cursor on an inserted line; the 3270 Enter key stays)
+            if not attention and not self._insert_focus:
+                self._focus_gutter(self._first_row_on_page())
+            return "break"
 
         if command == "SAVE":
             self.save_file()
@@ -1362,10 +1524,8 @@ class ISPFEditor:
                 self.exclude_all(args)
         elif command in ("RESET", "RES"):
             self.reset(args)
-        elif command == "UC":
-            self.change_case("upper")
-        elif command == "LC":
-            self.change_case("lower")
+        elif command in ("UC", "LC"):
+            self.change_case("upper" if command == "UC" else "lower", args)
         elif command == "HEX":
             self.toggle_hex()
         elif command == "HELP":
@@ -1661,7 +1821,8 @@ class ISPFEditor:
         for start_col, end_col, direction in reversed(fields):
             def field_key(record, start_col=start_col, end_col=end_col):
                 text = record[1][start_col - 1:end_col] if end_col else record[1][start_col - 1:]
-                return text.encode("utf-8").hex() if self.hex_mode else text
+                # Like SPFLite, letters sort without regard to case
+                return text.encode("utf-8").hex() if self.hex_mode else text.casefold()
             records = sorted(records, key=field_key, reverse=direction == "D")
 
         output = list(lines)
@@ -2062,9 +2223,15 @@ class ISPFEditor:
         try:
             with open(fname, "r") as f:
                 content = f.read()
+            # The newline ending the last line does not start another (empty) line
+            self._final_newline = content.endswith("\n")
+            if self._final_newline:
+                content = content[:-1]
             self.text.config(state=tk.NORMAL)  # previous file may have been read-only
             self.text.delete("1.0", tk.END)
             self.text.insert("1.0", content)
+            self.text.mark_set(tk.INSERT, "1.0")  # FIND starts at the top of the data
+            self._at_top_of_data = True
             self._baseline_lines = self.text.get("1.0", "end-1c").split("\n")
             self._error_lines.clear()
             self.text.edit_reset()
@@ -2096,8 +2263,10 @@ class ISPFEditor:
                 line for i, line in enumerate(self.text.get("1.0", "end-1c").split("\n"), 1)
                 if not line.startswith("=HEX> ") and not self._is_compare_line(i)
             )
+            # Like SPFLite, trailing blanks are not written to the file
+            trimmed = "\n".join(line.rstrip(" ") for line in content.split("\n"))
             with open(self.filename, "w") as f:
-                f.write(content)
+                f.write(trimmed + ("\n" if self._final_newline else ""))
             self._add_recent_file(self.filename)
             self._baseline_lines = content.split("\n")
             self._dirty = False
@@ -2273,6 +2442,20 @@ class ISPFEditor:
     }
 
     @staticmethod
+    def _match_fits(text, start, end, mode):
+        """Does text[start:end] satisfy the FIND/CHANGE match mode?
+        PREFIX/SUFFIX: start/end of a word, but not the whole word."""
+        left_word = start > 0 and text[start - 1].isalnum()
+        right_word = end < len(text) and text[end].isalnum()
+        if mode == "WORD":
+            return not left_word and not right_word
+        if mode == "PREFIX":
+            return not left_word and right_word
+        if mode == "SUFFIX":
+            return left_word and not right_word
+        return True
+
+    @staticmethod
     def _decode_search_string(value, quoted=False):
         m = re.fullmatch(r"([CXPT])(['\"])(.*)\2", value, re.IGNORECASE)
         if not m:
@@ -2363,14 +2546,10 @@ class ISPFEditor:
             segment = line[left:right]
             hay, needle = (segment, search_term) if exact else (segment.casefold(), search_term.casefold())
             offsets = []
-            if mode == "PREFIX": offsets = [0] if hay.startswith(needle) else []
-            elif mode == "SUFFIX": offsets = [len(segment)-len(search_term)] if hay.endswith(needle) else []
-            else:
-                pos = 0
-                while needle and (pos := hay.find(needle, pos)) >= 0:
-                    end = pos + len(needle)
-                    if mode != "WORD" or ((pos == 0 or not hay[pos-1].isalnum()) and (end == len(hay) or not hay[end].isalnum())): offsets.append(pos)
-                    pos += max(1, len(needle))
+            pos = 0
+            while needle and (pos := hay.find(needle, pos)) >= 0:
+                if self._match_fits(hay, pos, pos + len(needle), mode): offsets.append(pos)
+                pos += max(1, len(needle))
             candidates.extend((ln, left + off, len(search_term)) for off in offsets)
         candidates.sort()
         if "ALL" in options and not repeat:
@@ -2378,7 +2557,10 @@ class ISPFEditor:
             self.text.tag_remove("found", "1.0", tk.END)
             for ln, col, size in candidates: self.text.tag_add("found", f"{ln}.{col}", f"{ln}.{col+size}")
             if candidates:
-                self.text.see(f"{candidates[0][0]}.0")
+                first = f"{candidates[0][0]}.{candidates[0][1]}"
+                self.text.focus_set()
+                self.text.mark_set(tk.INSERT, first)
+                self.text.see(first)
             self.status.config(text=f"FIND: {len(candidates)} occurrence(s) of '{search_term}'")
             return
         def search(index, stop, backwards=False):
@@ -2393,6 +2575,9 @@ class ISPFEditor:
             cursor = range_end
         wrapped = False
         cl, cc = map(int, cursor.split("."))
+        if self._at_top_of_data and cursor == "1.0":
+            cc = -1     # just opened: a match at 1.0 is the next one, not this one
+        self._at_top_of_data = False
         if direction == "FIRST": chosen = candidates[0] if candidates else None
         elif direction == "LAST": chosen = candidates[-1] if candidates else None
         elif direction == "PREV": chosen = next((x for x in reversed(candidates) if (x[0], x[1]) < (cl, cc)), candidates[-1] if candidates else None)
@@ -2408,6 +2593,8 @@ class ISPFEditor:
             end = f"{start}+{len(search_term)}c"
             self.text.tag_remove("found", "1.0", tk.END)
             self.text.tag_add("found", start, end)
+            # Like ISPF, the cursor goes to the found string
+            self.text.focus_set()
             self.text.mark_set(tk.INSERT, start)
             self.text.see(start)
             col = int(start.split(".")[1]) + 1
@@ -2483,15 +2670,8 @@ class ISPFEditor:
             segment = line[left:right]
             for match in matcher.finditer(segment):
                 start, end = match.span()
-                left_word = start > 0 and segment[start - 1].isalnum()
-                right_word = end < len(segment) and segment[end].isalnum()
-                if mode == "WORD" and (left_word or right_word):
-                    continue
-                if mode == "PREFIX" and left_word:
-                    continue
-                if mode == "SUFFIX" and right_word:
-                    continue
-                candidates.append((line_no, left + start, end - start))
+                if self._match_fits(segment, start, end, mode):
+                    candidates.append((line_no, left + start, end - start))
 
         candidates.sort()
         if not candidates:
@@ -2523,15 +2703,25 @@ class ISPFEditor:
         if new_content != content:
             self._commit_text(new_content, old_state)
             self.refresh_gutter()
+        # Highlight every changed string where it is now (earlier changes on a
+        # line shift the later ones)
+        self.text.tag_remove("found", "1.0", tk.END)
+        shift = defaultdict(int)
+        for ln, c, length in chosen:
+            start = c + shift[ln]
+            self.text.tag_add("found", f"{ln}.{start}", f"{ln}.{start + len(new)}")
+            shift[ln] += len(new) - length
         # Put the cursor after the chosen occurrence so PF6 continues forward.
         line_no, col, size = chosen[-1]
         earlier_delta = sum(len(new) - length for ln, c, length in chosen
                             if ln == line_no and c < col)
         final_col = col + earlier_delta + len(new)
+        self.text.focus_set()
         self.text.mark_set(tk.INSERT, f"{line_no}.{final_col}")
         self.text.see(tk.INSERT)
         self._last_change = (old, new, exact, options, columns)
-        self.status.config(text=f"Changed {len(chosen)} occurrence(s) of '{old}' ({direction})")
+        scope = "ALL" if "ALL" in options else direction
+        self.status.config(text=f"Changed {len(chosen)} occurrence(s) of '{old}' ({scope})")
 
     def repeat_change(self):
         """Repeat the last CHANGE at the next matching occurrence."""
@@ -2547,13 +2737,42 @@ class ISPFEditor:
     # ------------------------------------------------------------------
     # Case Conversion
     # ------------------------------------------------------------------
-    def change_case(self, case):
-        """Convert entire buffer to upper or lower case (UC/LC)."""
-        content = self.text.get("1.0", "end-1c")
-        content = content.upper() if case == "upper" else content.lower()
-        self._commit_text(content, self._get_line_state())
-        self.refresh_gutter()
-        self.status.config(text=f"Converted to {'UPPER' if case == 'upper' else 'lower'} case")
+    def change_case(self, case, args=("ALL",)):
+        """UC/LC primary command: ALL, one line (.a) or a range (.a .b).
+
+        Like SPFLite, a line range is required: UC alone changes nothing."""
+        command = "UC" if case == "upper" else "LC"
+        values = [a.upper() for a in args]
+        if not values:
+            self.status.config(text=f"{command}: pending line range - "
+                                    f"enter {command} ALL, {command} .a or {command} .a .b")
+            return
+        if values == ["ALL"]:
+            first, last = 1, self._text_line_count()
+        elif len(values) <= 2 and all(v.startswith(".") for v in values):
+            resolved = [self._resolve_target(v) for v in values]
+            if None in resolved:
+                undefined = values[resolved.index(None)]
+                self.status.config(text=f"{command}: line reference {undefined} is undefined")
+                return
+            first, last = min(resolved), max(resolved)
+        else:
+            self.status.config(text=f"{command}: use {command} ALL, {command} .a or {command} .a .b")
+            return
+        lines = self.text.get("1.0", "end-1c").split("\n")
+        altered = 0
+        for i in range(first - 1, last):
+            # HX rows and COMPARE rows are display information, not data
+            if lines[i].startswith("=HEX> ") or self._is_compare_line(i + 1):
+                continue
+            new = lines[i].upper() if case == "upper" else lines[i].lower()
+            altered += new != lines[i]
+            lines[i] = new
+        if altered:
+            self._commit_text("\n".join(lines), self._get_line_state())
+            self._dirty = True
+            self.refresh_gutter(keep=self._get_pending_commands())
+        self.status.config(text=f"{command}: {altered} line(s) altered")
 
     # ------------------------------------------------------------------
     # Clipboard Operations
@@ -2584,6 +2803,13 @@ class ISPFEditor:
             self.status.config(text="HEX ON - showing character codes (simplified)")
         else:
             self.status.config(text="HEX OFF")
+        self.update_status()
+
+    def _text_key_release(self, event):
+        """Show the cursor position while typing, but keep the message of an
+        Enter key (it may have been pressed on the command line, e.g. FIND ALL)."""
+        if event.keysym in ("Return", "KP_Enter", "Control_R"):
+            return
         self.update_status()
 
     def update_status(self, event=None):
@@ -2637,7 +2863,8 @@ PRIMARY COMMANDS (enter at Command ===>):
   COMPARE *  - Insert inline changes since open or last save
   COMPARE file - Compare the current buffer with another text file
   SORT [ .start .end ] [X|NX] [[A|D] start_col end_col ...]
-             - Sort full lines or up to five columns; default ascending
+             - Sort full lines or up to five columns; default ascending,
+               upper and lower case sort alike
   SORT D     - Sort full lines in descending order
   DELETE/DEL ALL [X|NX] [ .start .end ]
              - Delete every selected line (X=excluded, NX=shown)
@@ -2654,7 +2881,8 @@ PRIMARY COMMANDS (enter at Command ===>):
   RESET/RES  - Show excluded lines, clear pending line commands,
                hex info lines and find highlight. Keywords: EXCLUDED COMMAND
                FIND LABEL ALL (LABEL/ALL also remove labels)
-  UC / LC    - Convert entire file to UPPER / lower case
+  UC/LC ALL | .a [.b] - Convert all lines, line .a or lines .a-.b to
+               UPPER / lower case (a line range is required)
   HEX        - Toggle hex display mode
   UNDO [ALL] - Undo one interaction, or all available undo history
   REDO       - Redo the last undone interaction
@@ -2672,7 +2900,9 @@ LINE COMMANDS (type DIRECTLY on the line number):
   Enter (in the number area or the text area). Several
   commands can be entered before pressing Enter.
 
-  I[n]     - Insert n blank lines after this line
+  I[n]     - Insert n temporary lines ('''''') after this line; untouched
+             ones vanish on the next Enter, Enter on the last typed one
+             adds another
   D[n]     - Delete n lines            DD..DD - delete block
   R[n]     - Repeat line n times       RR..RR - repeat block
   C[n]     - Copy n lines              CC..CC - copy block
@@ -2692,6 +2922,8 @@ LINE COMMANDS (type DIRECTLY on the line number):
   X[n]     - Exclude (hide) n lines    XX..XX - exclude block
   .label   - Set a label (. + 1-5 letters), shown in place of
              the number. Type spaces over it to remove it.
+  .n       - In primary commands, line n (e.g. DELETE .3 .5)
+  D/C/M/UC/LC n - The count must not run past the last line
   C or M without a destination keeps the lines for later A/B/O use.
 
   On an excluded line (- - - ):
@@ -2722,6 +2954,10 @@ KEYBOARD:
   F10/11  - Scroll left/right one page
   F12     - Retrieve command (set ISPFEditor.PF12_ACTION to CANCEL for Cancel)
   Tab     - Move between line command area and text
+  Enter   - Runs pending commands; with nothing to run it moves to the
+            next line command field (never splits a line - use TS)
+  Right Ctrl, keypad Enter, Shift/Ctrl/Alt+Enter
+          - 3270 Enter: always processes, the cursor stays put
   Ctrl+S  - Save
   Ctrl+F  - Find
 """

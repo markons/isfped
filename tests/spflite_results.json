@@ -1,0 +1,3981 @@
+{
+ "D single": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'D' .3"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'D' .3",
+    "'D' applied"
+   ]
+  ]
+ },
+ "D count D3": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'D3' .3"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'D3' .3",
+    "'D3' applied"
+   ]
+  ]
+ },
+ "D count past end": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'D5' .9"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'D5' .9",
+    "Repeat value extends past the last line - line 000009"
+   ]
+  ]
+ },
+ "D first line": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'D' .1"
+  ],
+  "output": [
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'D' .1",
+    "'D' applied"
+   ]
+  ]
+ },
+ "D last line": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'D' .10"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'D' .10",
+    "'D' applied"
+   ]
+  ]
+ },
+ "DD block": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'DD' .5",
+   "LINE 'DD' .3"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'DD' .5",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'DD' .3",
+    "'DD' applied"
+   ]
+  ]
+ },
+ "D two lines one Enter": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'D' .5",
+   "LINE 'D' .2"
+  ],
+  "output": [
+   "alpha one",
+   "gamma three",
+   "    delta four",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'D' .5",
+    "'D' applied"
+   ],
+   [
+    0,
+    "LINE 'D' .2",
+    "'D' applied"
+   ]
+  ]
+ },
+ "DD block reversed order typed": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'DD' .2",
+   "LINE 'DD' .4"
+  ],
+  "output": [
+   "alpha one",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'DD' .2",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'DD' .4",
+    "'DD' applied"
+   ]
+  ]
+ },
+ "I untouched dropped": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'I' .3"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'I' .3",
+    "'I' applied"
+   ]
+  ]
+ },
+ "I5 untouched dropped": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'I5' .3"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'I5' .3",
+    "'I5' applied"
+   ]
+  ]
+ },
+ "R single": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'R' .2"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'R' .2",
+    "'R' applied"
+   ]
+  ]
+ },
+ "R3": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'R3' .2"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "  beta two",
+   "  beta two",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'R3' .2",
+    "'R3' applied"
+   ]
+  ]
+ },
+ "RR block": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'RR' .3",
+   "LINE 'RR' .2"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'RR' .3",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'RR' .2",
+    "'RR' applied"
+   ]
+  ]
+ },
+ "RR block count": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'RR' .3",
+   "LINE 'RR2' .2"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "  beta two",
+   "gamma three",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'RR' .3",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'RR2' .2",
+    "'RR2' applied"
+   ]
+  ]
+ },
+ "R last line": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'R' .10"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'R' .10",
+    "'R' applied"
+   ]
+  ]
+ },
+ "C A": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'A' .5",
+   "LINE 'C' .2"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "  beta two",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'A' .5",
+    "Pending Source line range command"
+   ],
+   [
+    0,
+    "LINE 'C' .2",
+    "'C' applied"
+   ]
+  ]
+ },
+ "C B": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'B' .5",
+   "LINE 'C' .2"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "  beta two",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'B' .5",
+    "Pending Source line range command"
+   ],
+   [
+    0,
+    "LINE 'C' .2",
+    "'C' applied"
+   ]
+  ]
+ },
+ "C3 A": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'A' .9",
+   "LINE 'C3' .2"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'A' .9",
+    "Pending Source line range command"
+   ],
+   [
+    0,
+    "LINE 'C3' .2",
+    "'C3' applied"
+   ]
+  ]
+ },
+ "CC A": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'A' .5",
+   "LINE 'CC' .3",
+   "LINE 'CC' .2"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "  beta two",
+   "gamma three",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'A' .5",
+    "Pending Source line range command"
+   ],
+   [
+    2,
+    "LINE 'CC' .3",
+    "Previous range command incomplete - line 000005"
+   ],
+   [
+    0,
+    "LINE 'CC' .2",
+    "'CC' applied"
+   ]
+  ]
+ },
+ "CC B first": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'CC' .5",
+   "LINE 'CC' .4",
+   "LINE 'B' .1"
+  ],
+  "output": [
+   "    delta four",
+   "epsilon five",
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'CC' .5",
+    "Pending command(s)"
+   ],
+   [
+    2,
+    "LINE 'CC' .4",
+    "Pending Destination line range command"
+   ],
+   [
+    0,
+    "LINE 'B' .1",
+    "'B' applied"
+   ]
+  ]
+ },
+ "CC then A later Enter": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'CC' .2",
+   "LINE 'CC' .3",
+   "LINE 'A' .5"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "  beta two",
+   "gamma three",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'CC' .2",
+    "Pending command(s)"
+   ],
+   [
+    2,
+    "LINE 'CC' .3",
+    "Pending Destination line range command"
+   ],
+   [
+    0,
+    "LINE 'A' .5",
+    "'A' applied"
+   ]
+  ]
+ },
+ "C A2 repeat dest": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'A2' .5",
+   "LINE 'C' .2"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "  beta two",
+   "  beta two",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'A2' .5",
+    "Pending Source line range command"
+   ],
+   [
+    0,
+    "LINE 'C' .2",
+    "'C' applied"
+   ]
+  ]
+ },
+ "M A": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'A' .5",
+   "LINE 'M' .2"
+  ],
+  "output": [
+   "alpha one",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "  beta two",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'A' .5",
+    "Pending Source line range command"
+   ],
+   [
+    0,
+    "LINE 'M' .2",
+    "'M' applied"
+   ]
+  ]
+ },
+ "M B up": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'M' .7",
+   "LINE 'B' .2"
+  ],
+  "output": [
+   "alpha one",
+   "eta seven",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'M' .7",
+    "Pending Destination line range command"
+   ],
+   [
+    0,
+    "LINE 'B' .2",
+    "'B' applied"
+   ]
+  ]
+ },
+ "M2 A": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'A' .9",
+   "LINE 'M2' .2"
+  ],
+  "output": [
+   "alpha one",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "  beta two",
+   "gamma three",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'A' .9",
+    "Pending Source line range command"
+   ],
+   [
+    0,
+    "LINE 'M2' .2",
+    "'M2' applied"
+   ]
+  ]
+ },
+ "MM A": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'A' .8",
+   "LINE 'MM' .3",
+   "LINE 'MM' .2"
+  ],
+  "output": [
+   "alpha one",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "  beta two",
+   "gamma three",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'A' .8",
+    "Pending Source line range command"
+   ],
+   [
+    2,
+    "LINE 'MM' .3",
+    "Previous range command incomplete - line 000008"
+   ],
+   [
+    0,
+    "LINE 'MM' .2",
+    "'MM' applied"
+   ]
+  ]
+ },
+ "MM B top": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'MM' .8",
+   "LINE 'MM' .7",
+   "LINE 'B' .1"
+  ],
+  "output": [
+   "eta seven",
+   "theta eight",
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'MM' .8",
+    "Pending command(s)"
+   ],
+   [
+    2,
+    "LINE 'MM' .7",
+    "Pending Destination line range command"
+   ],
+   [
+    0,
+    "LINE 'B' .1",
+    "'B' applied"
+   ]
+  ]
+ },
+ "C last line A": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'C' .10",
+   "LINE 'A' .9"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'C' .10",
+    "Pending Destination line range command"
+   ],
+   [
+    0,
+    "LINE 'A' .9",
+    "'A' applied"
+   ]
+  ]
+ },
+ "C O overlay": {
+  "input": [
+   "ab  ef",
+   "  cd  gh"
+  ],
+  "commands": [
+   "LINE 'O' .2",
+   "LINE 'C' .1"
+  ],
+  "output": [
+   "ab  ef",
+   "abcdefgh"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'O' .2",
+    "Pending Source line range command"
+   ],
+   [
+    0,
+    "LINE 'C' .1",
+    "'C' applied"
+   ]
+  ]
+ },
+ "CC OO overlay": {
+  "input": [
+   "x",
+   "y ",
+   "    1",
+   "    2",
+   "    3"
+  ],
+  "commands": [
+   "LINE 'OO' .5",
+   "LINE 'OO' .3",
+   "LINE 'CC' .2",
+   "LINE 'CC' .1"
+  ],
+  "output": [
+   "x",
+   "y",
+   "x   1",
+   "y   2",
+   "x   3"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'OO' .5",
+    "Pending command(s)"
+   ],
+   [
+    2,
+    "LINE 'OO' .3",
+    "Pending Source line range command"
+   ],
+   [
+    2,
+    "LINE 'CC' .2",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'CC' .1",
+    "'CC' applied"
+   ]
+  ]
+ },
+ "UC": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "LINE 'UC' .1"
+  ],
+  "output": [
+   "HELLO WORLD",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'UC' .1",
+    "'UC' applied"
+   ]
+  ]
+ },
+ "UC3": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "LINE 'UC3' .1"
+  ],
+  "output": [
+   "HELLO WORLD",
+   "MIXED CASE LINE",
+   "LOWER ONLY",
+   "UPPER ONLY"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'UC3' .1",
+    "'UC3' applied"
+   ]
+  ]
+ },
+ "UCC block": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "LINE 'UCC' .3",
+   "LINE 'UCC' .1"
+  ],
+  "output": [
+   "HELLO WORLD",
+   "MIXED CASE LINE",
+   "LOWER ONLY",
+   "UPPER ONLY"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'UCC' .3",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'UCC' .1",
+    "'UCC' applied"
+   ]
+  ]
+ },
+ "LC": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "LINE 'LC' .2"
+  ],
+  "output": [
+   "Hello World",
+   "mixed case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'LC' .2",
+    "'LC' applied"
+   ]
+  ]
+ },
+ "LCC block": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "LINE 'LCC' .4",
+   "LINE 'LCC' .1"
+  ],
+  "output": [
+   "hello world",
+   "mixed case line",
+   "lower only",
+   "upper only"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'LCC' .4",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'LCC' .1",
+    "'LCC' applied"
+   ]
+  ]
+ },
+ "( column shift left": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '(' .1"
+  ],
+  "output": [
+   "pha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '(' .1",
+    "'(' applied"
+   ]
+  ]
+ },
+ "(4 column shift left": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '(4' .4"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '(4' .4",
+    "'(4' applied"
+   ]
+  ]
+ },
+ ") column shift right": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE ')' .1"
+  ],
+  "output": [
+   "  alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE ')' .1",
+    "')' applied"
+   ]
+  ]
+ },
+ ")5": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE ')5' .1"
+  ],
+  "output": [
+   "     alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE ')5' .1",
+    "')5' applied"
+   ]
+  ]
+ },
+ "(( block": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '((' .4",
+   "LINE '((' .2"
+  ],
+  "output": [
+   "alpha one",
+   "beta two",
+   "mma three",
+   "  delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE '((' .4",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE '((' .2",
+    "'((' applied"
+   ]
+  ]
+ },
+ "))3 block": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '))' .4",
+   "LINE '))3' .2"
+  ],
+  "output": [
+   "alpha one",
+   "     beta two",
+   "   gamma three",
+   "       delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE '))' .4",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE '))3' .2",
+    "'))3' applied"
+   ]
+  ]
+ },
+ "< data shift left": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '<' .4"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "  delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '<' .4",
+    "'<' applied"
+   ]
+  ]
+ },
+ "<6 data shift beyond indent": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '<6' .4"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   " delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '<6' .4",
+    "'<6' applied"
+   ]
+  ]
+ },
+ "> data shift right": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '>' .1"
+  ],
+  "output": [
+   "alpha   one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '>' .1",
+    "'>' applied"
+   ]
+  ]
+ },
+ "<< block": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '<<' .4",
+   "LINE '<<' .2"
+  ],
+  "output": [
+   "alpha one",
+   " beta two",
+   "gamma three",
+   "  delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE '<<' .4",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE '<<' .2",
+    "'<<' applied"
+   ]
+  ]
+ },
+ "( on unindented loses data": {
+  "input": [
+   "abcdef"
+  ],
+  "commands": [
+   "LINE '(3' .1"
+  ],
+  "output": [
+   "def"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '(3' .1",
+    "'(3' applied"
+   ]
+  ]
+ },
+ "< on unindented keeps data": {
+  "input": [
+   "abcdef"
+  ],
+  "commands": [
+   "LINE '<3' .1"
+  ],
+  "output": [
+   "abcdef"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '<3' .1",
+    "'<3' applied"
+   ]
+  ]
+ },
+ "X then D on block": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'X3' .3",
+   "LINE 'D' .3"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'X3' .3",
+    "'X3' applied"
+   ],
+   [
+    0,
+    "LINE 'D' .3",
+    "'D' applied"
+   ]
+  ]
+ },
+ "XX then DELETE ALL X": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'XX' .4",
+   "LINE 'XX' .2",
+   "DELETE ALL X"
+  ],
+  "output": [
+   "alpha one",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'XX' .4",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'XX' .2",
+    "'XX' applied"
+   ],
+   [
+    0,
+    "DELETE ALL X",
+    "Deleted 3 lines"
+   ]
+  ]
+ },
+ "XX then DELETE ALL NX": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'XX' .4",
+   "LINE 'XX' .2",
+   "DELETE ALL NX"
+  ],
+  "output": [
+   "  beta two",
+   "gamma three",
+   "    delta four"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'XX' .4",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'XX' .2",
+    "'XX' applied"
+   ],
+   [
+    0,
+    "DELETE ALL NX",
+    "Deleted 7 lines"
+   ]
+  ]
+ },
+ "X ALL, FIND ALL, DELETE ALL X": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "X ALL",
+   "FIND ALL eta",
+   "DELETE ALL X"
+  ],
+  "output": [
+   ""
+  ],
+  "log": [
+   [
+    0,
+    "X ALL",
+    "Excluded 10 lines"
+   ],
+   [
+    0,
+    "FIND ALL eta",
+    "CHARS eta found 4 times"
+   ],
+   [
+    0,
+    "DELETE ALL X",
+    "Deleted 10 lines"
+   ]
+  ]
+ },
+ "X string ALL, DELETE ALL X": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "X ALL 'ta'",
+   "DELETE ALL X"
+  ],
+  "output": [
+   "alpha one",
+   "gamma three",
+   "epsilon five",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "X ALL 'ta'",
+    "Excluded 6 lines"
+   ],
+   [
+    0,
+    "DELETE ALL X",
+    "Deleted 6 lines"
+   ]
+  ]
+ },
+ "X ALL, F on block shows first": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "X ALL",
+   "LINE 'F2' .1",
+   "DELETE ALL X"
+  ],
+  "output": [
+   ""
+  ],
+  "log": [
+   [
+    0,
+    "X ALL",
+    "Excluded 10 lines"
+   ],
+   [
+    8,
+    "LINE 'F2' .1",
+    "FIRST allowed on EXCLUDED lines only"
+   ],
+   [
+    0,
+    "DELETE ALL X",
+    "Deleted 10 lines"
+   ]
+  ]
+ },
+ "X ALL, L on block shows last": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "X ALL",
+   "LINE 'L3' .1",
+   "DELETE ALL X"
+  ],
+  "output": [
+   ""
+  ],
+  "log": [
+   [
+    0,
+    "X ALL",
+    "Excluded 10 lines"
+   ],
+   [
+    8,
+    "LINE 'L3' .1",
+    "LAST allowed on EXCLUDED lines only"
+   ],
+   [
+    0,
+    "DELETE ALL X",
+    "Deleted 10 lines"
+   ]
+  ]
+ },
+ "C ALL NX": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'XX' .5",
+   "LINE 'XX' .1",
+   "C ALL e E NX"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zEta six",
+   "Eta sEvEn",
+   "thEta Eight",
+   "iota ninE",
+   "kappa tEn"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'XX' .5",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'XX' .1",
+    "'XX' applied"
+   ],
+   [
+    0,
+    "C ALL e E NX",
+    "CHARS e triggered change processing 8 times in 5 lines"
+   ]
+  ]
+ },
+ "C ALL X": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'XX' .5",
+   "LINE 'XX' .1",
+   "C ALL e E X"
+  ],
+  "output": [
+   "alpha onE",
+   "  bEta two",
+   "gamma thrEE",
+   "    dElta four",
+   "Epsilon fivE",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'XX' .5",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'XX' .1",
+    "'XX' applied"
+   ],
+   [
+    0,
+    "C ALL e E X",
+    "CHARS e triggered change processing 7 times in 5 lines"
+   ]
+  ]
+ },
+ "XX then CC on block A": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'XX' .3",
+   "LINE 'XX' .2",
+   "LINE 'A' .6",
+   "LINE 'C' .2"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "  beta two",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'XX' .3",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'XX' .2",
+    "'XX' applied"
+   ],
+   [
+    2,
+    "LINE 'A' .6",
+    "Pending Source line range command"
+   ],
+   [
+    0,
+    "LINE 'C' .2",
+    "'C' applied"
+   ]
+  ]
+ },
+ "TF20": {
+  "input": [
+   "The quick brown fox",
+   "jumps over",
+   "the lazy dog and keeps running far away.",
+   "",
+   "Second paragraph here."
+  ],
+  "commands": [
+   "LINE 'TF20' .1"
+  ],
+  "output": [
+   "The quick brown fox",
+   "jumps over the lazy",
+   "dog and keeps",
+   "running far away.",
+   "",
+   "Second paragraph here."
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'TF20' .1",
+    "'TF20' applied"
+   ]
+  ]
+ },
+ "TF30 second para": {
+  "input": [
+   "The quick brown fox",
+   "jumps over",
+   "the lazy dog and keeps running far away.",
+   "",
+   "Second paragraph here."
+  ],
+  "commands": [
+   "LINE 'TF30' .5"
+  ],
+  "output": [
+   "The quick brown fox",
+   "jumps over",
+   "the lazy dog and keeps running far away.",
+   "",
+   "Second paragraph here."
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'TF30' .5",
+    "'TF30' applied"
+   ]
+  ]
+ },
+ "labels DELETE range": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '.BB' .6",
+   "LINE '.AA' .3",
+   "DELETE .AA .BB"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '.BB' .6",
+    "'.BB' applied"
+   ],
+   [
+    0,
+    "LINE '.AA' .3",
+    "'.AA' applied"
+   ],
+   [
+    0,
+    "DELETE .AA .BB",
+    "Deleted 1 line"
+   ]
+  ]
+ },
+ "labels C ALL range": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '.BB' .6",
+   "LINE '.AA' .3",
+   "C ALL e E .AA .BB"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma thrEE",
+   "    dElta four",
+   "Epsilon fivE",
+   "zEta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '.BB' .6",
+    "'.BB' applied"
+   ],
+   [
+    0,
+    "LINE '.AA' .3",
+    "'.AA' applied"
+   ],
+   [
+    0,
+    "C ALL e E .AA .BB",
+    "CHARS e triggered change processing 6 times in 4 lines"
+   ]
+  ]
+ },
+ "labels SORT range": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '.BB' .9",
+   "LINE '.AA' .6",
+   "SORT .AA .BB"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "eta seven",
+   "iota nine",
+   "theta eight",
+   "zeta six",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '.BB' .9",
+    "'.BB' applied"
+   ],
+   [
+    0,
+    "LINE '.AA' .6",
+    "'.AA' applied"
+   ],
+   [
+    0,
+    "SORT .AA .BB",
+    "SORT Complete"
+   ]
+  ]
+ },
+ "pseudo labels DELETE .3 .5": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "DELETE .3 .5"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "DELETE .3 .5",
+    "Deleted 1 line"
+   ]
+  ]
+ },
+ "label follows move": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '.AA' .5",
+   "LINE 'D' .1",
+   "DELETE .AA .AA"
+  ],
+  "output": [
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '.AA' .5",
+    "'.AA' applied"
+   ],
+   [
+    0,
+    "LINE 'D' .1",
+    "'D' applied"
+   ],
+   [
+    0,
+    "DELETE .AA .AA",
+    "Deleted 1 line"
+   ]
+  ]
+ },
+ "C ALL": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "C ALL e E"
+  ],
+  "output": [
+   "alpha onE",
+   "  bEta two",
+   "gamma thrEE",
+   "    dElta four",
+   "Epsilon fivE",
+   "zEta six",
+   "Eta sEvEn",
+   "thEta Eight",
+   "iota ninE",
+   "kappa tEn"
+  ],
+  "log": [
+   [
+    0,
+    "C ALL e E",
+    "CHARS e triggered change processing 15 times in 10 lines"
+   ]
+  ]
+ },
+ "C first from top": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "C e E"
+  ],
+  "output": [
+   "alpha onE",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "C e E",
+    ""
+   ]
+  ]
+ },
+ "C at line 1 col 1": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "C alpha ALPHA"
+  ],
+  "output": [
+   "ALPHA one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "C alpha ALPHA",
+    ""
+   ]
+  ]
+ },
+ "C LAST": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "C e E LAST"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa tEn"
+  ],
+  "log": [
+   [
+    0,
+    "C e E LAST",
+    ""
+   ]
+  ]
+ },
+ "C then RCHANGE": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "C e E",
+   "RCHANGE",
+   "RCHANGE"
+  ],
+  "output": [
+   "alpha onE",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "C e E",
+    ""
+   ],
+   [
+    0,
+    "RCHANGE",
+    ""
+   ],
+   [
+    0,
+    "RCHANGE",
+    ""
+   ]
+  ]
+ },
+ "C ALL columns": {
+  "input": [
+   "abcabc",
+   "xabcx",
+   "abc abc",
+   "cab abcd",
+   "ab"
+  ],
+  "commands": [
+   "C ALL abc X 2 4"
+  ],
+  "output": [
+   "abcabc",
+   "xabcx",
+   "abc abc",
+   "cab abcd",
+   "ab"
+  ],
+  "log": [
+   [
+    8,
+    "C ALL abc X 2 4",
+    "Command requires 2 TEXT literals, 1 was entered"
+   ]
+  ]
+ },
+ "C ALL WORD": {
+  "input": [
+   "abcabc",
+   "xabcx",
+   "abc abc",
+   "cab abcd",
+   "ab"
+  ],
+  "commands": [
+   "C ALL abc Z WORD"
+  ],
+  "output": [
+   "abcabc",
+   "xabcx",
+   "Z Z",
+   "cab abcd",
+   "ab"
+  ],
+  "log": [
+   [
+    0,
+    "C ALL abc Z WORD",
+    "WORD abc triggered change processing 2 times in 1 lines"
+   ]
+  ]
+ },
+ "C ALL PREFIX": {
+  "input": [
+   "abcabc",
+   "xabcx",
+   "abc abc",
+   "cab abcd",
+   "ab"
+  ],
+  "commands": [
+   "C ALL abc Z PREFIX"
+  ],
+  "output": [
+   "Zabc",
+   "xabcx",
+   "abc abc",
+   "cab Zd",
+   "ab"
+  ],
+  "log": [
+   [
+    0,
+    "C ALL abc Z PREFIX",
+    "CHARS abc triggered change processing 2 times"
+   ]
+  ]
+ },
+ "C ALL SUFFIX": {
+  "input": [
+   "abcabc",
+   "xabcx",
+   "abc abc",
+   "cab abcd",
+   "ab"
+  ],
+  "commands": [
+   "C ALL abc Z SUFFIX"
+  ],
+  "output": [
+   "abcZ",
+   "xabcx",
+   "abc abc",
+   "cab abcd",
+   "ab"
+  ],
+  "log": [
+   [
+    0,
+    "C ALL abc Z SUFFIX",
+    "CHARS abc triggered change processing 1 time"
+   ]
+  ]
+ },
+ "C ALL caseless": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "C ALL o 0"
+  ],
+  "output": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "log": [
+   [
+    8,
+    "C ALL o 0",
+    "Command requires 2 TEXT literals, 1 was entered"
+   ]
+  ]
+ },
+ "C ALL C'' exact": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "C ALL C'O' 0"
+  ],
+  "output": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "log": [
+   [
+    8,
+    "C ALL C'O' 0",
+    "Command requires 2 TEXT literals, 1 was entered"
+   ]
+  ]
+ },
+ "C ALL quoted space": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "C ALL ' t' '_T'"
+  ],
+  "output": [
+   "alpha one",
+   "  beta_Two",
+   "gamma_Three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa_Ten"
+  ],
+  "log": [
+   [
+    0,
+    "C ALL ' t' '_T'",
+    "CHARS ' t' triggered change processing 3 times"
+   ]
+  ]
+ },
+ "C ALL to empty": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "C ALL 'e' ''"
+  ],
+  "output": [
+   "alpha on",
+   "  bta two",
+   "gamma thr",
+   "    dlta four",
+   "psilon fiv",
+   "zta six",
+   "ta svn",
+   "thta ight",
+   "iota nin",
+   "kappa tn"
+  ],
+  "log": [
+   [
+    0,
+    "C ALL 'e' ''",
+    "CHARS 'e' triggered change processing 15 times in 10 lines"
+   ]
+  ]
+ },
+ "C ALL hex string": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "C ALL X'61' '@'"
+  ],
+  "output": [
+   "@lph@ one",
+   "  bet@ two",
+   "g@mm@ three",
+   "    delt@ four",
+   "epsilon five",
+   "zet@ six",
+   "et@ seven",
+   "thet@ eight",
+   "iot@ nine",
+   "k@pp@ ten"
+  ],
+  "log": [
+   [
+    0,
+    "C ALL X'61' '@'",
+    "CHARS X'61' triggered change processing 12 times in 9 lines"
+   ]
+  ]
+ },
+ "C ALL longer replacement": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "C ALL a aaa"
+  ],
+  "output": [
+   "aaalphaaa one",
+   "  betaaa two",
+   "gaaammaaa three",
+   "    deltaaa four",
+   "epsilon five",
+   "zetaaa six",
+   "etaaa seven",
+   "thetaaa eight",
+   "iotaaa nine",
+   "kaaappaaa ten"
+  ],
+  "log": [
+   [
+    0,
+    "C ALL a aaa",
+    "CHARS a triggered change processing 12 times in 9 lines"
+   ]
+  ]
+ },
+ "C not found": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "C ALL zzz yyy"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    8,
+    "C ALL zzz yyy",
+    "CHARS zzz Not found"
+   ]
+  ]
+ },
+ "FIND then C NEXT": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "F theta",
+   "C e E"
+  ],
+  "output": [
+   "alpha onE",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "F theta",
+    "CHARS theta found"
+   ],
+   [
+    0,
+    "C e E",
+    ""
+   ]
+  ]
+ },
+ "DELETE without operands refused": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "DELETE"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    8,
+    "DELETE",
+    "No search string, but no ALL specified"
+   ]
+  ]
+ },
+ "DELETE ALL X with nothing excluded": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "DELETE ALL X"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    8,
+    "DELETE ALL X",
+    "No lines found"
+   ]
+  ]
+ },
+ "SORT": {
+  "input": [
+   "pear 3",
+   "apple 10",
+   "Banana 2",
+   "cherry 1",
+   "apple 2"
+  ],
+  "commands": [
+   "SORT"
+  ],
+  "output": [
+   "apple 10",
+   "apple 2",
+   "Banana 2",
+   "cherry 1",
+   "pear 3"
+  ],
+  "log": [
+   [
+    0,
+    "SORT",
+    "SORT Complete"
+   ]
+  ]
+ },
+ "SORT D": {
+  "input": [
+   "pear 3",
+   "apple 10",
+   "Banana 2",
+   "cherry 1",
+   "apple 2"
+  ],
+  "commands": [
+   "SORT D"
+  ],
+  "output": [
+   "pear 3",
+   "cherry 1",
+   "Banana 2",
+   "apple 2",
+   "apple 10"
+  ],
+  "log": [
+   [
+    0,
+    "SORT D",
+    "SORT Complete"
+   ]
+  ]
+ },
+ "SORT columns": {
+  "input": [
+   "pear 3",
+   "apple 10",
+   "Banana 2",
+   "cherry 1",
+   "apple 2"
+  ],
+  "commands": [
+   "SORT 2 3"
+  ],
+  "output": [
+   "Banana 2",
+   "pear 3",
+   "cherry 1",
+   "apple 10",
+   "apple 2"
+  ],
+  "log": [
+   [
+    0,
+    "SORT 2 3",
+    "SORT Complete"
+   ]
+  ]
+ },
+ "SORT two fields": {
+  "input": [
+   "pear 3",
+   "apple 10",
+   "Banana 2",
+   "cherry 1",
+   "apple 2"
+  ],
+  "commands": [
+   "SORT A 1 5 D 7 8"
+  ],
+  "output": [
+   "apple 2",
+   "apple 10",
+   "Banana 2",
+   "cherry 1",
+   "pear 3"
+  ],
+  "log": [
+   [
+    0,
+    "SORT A 1 5 D 7 8",
+    "SORT Complete"
+   ]
+  ]
+ },
+ "UNDO line command": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'D' .2",
+   "UNDO"
+  ],
+  "output": [
+   "alpha one",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'D' .2",
+    "'D' applied"
+   ],
+   [
+    8,
+    "UNDO",
+    "UNDO command not supported in Macro mode"
+   ]
+  ]
+ },
+ "UNDO twice": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'D' .2",
+   "LINE 'D' .2",
+   "UNDO",
+   "UNDO"
+  ],
+  "output": [
+   "alpha one",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'D' .2",
+    "'D' applied"
+   ],
+   [
+    8,
+    "LINE 'D' .2",
+    "Line reference .2 is undefined"
+   ],
+   [
+    8,
+    "UNDO",
+    "UNDO command not supported in Macro mode"
+   ],
+   [
+    8,
+    "UNDO",
+    "UNDO command not supported in Macro mode"
+   ]
+  ]
+ },
+ "RESET discards pending": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'CC' .2",
+   "RESET",
+   "LINE 'D' .5"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'CC' .2",
+    "Pending command(s)"
+   ],
+   [
+    2,
+    "RESET",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE 'D' .5",
+    "'D' applied"
+   ]
+  ]
+ },
+ "primary UC": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "UC"
+  ],
+  "output": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "log": [
+   [
+    8,
+    "UC",
+    "Pending line range"
+   ]
+  ]
+ },
+ "primary LC": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "LC"
+  ],
+  "output": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "log": [
+   [
+    8,
+    "LC",
+    "Pending line range"
+   ]
+  ]
+ },
+ "> on indented line": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '>' .2"
+  ],
+  "output": [
+   "alpha one",
+   "    beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '>' .2",
+    "'>' applied"
+   ]
+  ]
+ },
+ ">3 on one word": {
+  "input": [
+   "abcdef"
+  ],
+  "commands": [
+   "LINE '>3' .1"
+  ],
+  "output": [
+   "abcdef"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '>3' .1",
+    "'>3' applied"
+   ]
+  ]
+ },
+ ">3 widens first gap": {
+  "input": [
+   "ab cd  ef"
+  ],
+  "commands": [
+   "LINE '>3' .1"
+  ],
+  "output": [
+   "ab    cd ef"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '>3' .1",
+    "'>3' applied"
+   ]
+  ]
+ },
+ "<3 closes first gap": {
+  "input": [
+   "ab     cd ef"
+  ],
+  "commands": [
+   "LINE '<3' .1"
+  ],
+  "output": [
+   "ab  cd ef"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '<3' .1",
+    "'<3' applied"
+   ]
+  ]
+ },
+ "<3 first gap too small": {
+  "input": [
+   "ab  cd   ef"
+  ],
+  "commands": [
+   "LINE '<3' .1"
+  ],
+  "output": [
+   "ab cd    ef"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '<3' .1",
+    "'<3' applied"
+   ]
+  ]
+ },
+ "<6 indent then inner gap": {
+  "input": [
+   "   ab     cd"
+  ],
+  "commands": [
+   "LINE '<6' .1"
+  ],
+  "output": [
+   " ab       cd"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '<6' .1",
+    "'<6' applied"
+   ]
+  ]
+ },
+ ">>3 block": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE '>>' .2",
+   "LINE '>>3' .1"
+  ],
+  "output": [
+   "alpha    one",
+   "     beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE '>>' .2",
+    "Pending command(s)"
+   ],
+   [
+    0,
+    "LINE '>>3' .1",
+    "'>>3' applied"
+   ]
+  ]
+ },
+ "D count to last line": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'D3' .8"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven"
+  ],
+  "log": [
+   [
+    0,
+    "LINE 'D3' .8",
+    "'D3' applied"
+   ]
+  ]
+ },
+ "X count past end": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'X5' .9"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'X5' .9",
+    "Repeat value extends past the last line - line 000009"
+   ]
+  ]
+ },
+ "UC count past end": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'UC5' .9"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'UC5' .9",
+    "Repeat value extends past the last line - line 000009"
+   ]
+  ]
+ },
+ "C count past end": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "LINE 'C5' .9",
+   "LINE 'A' .1"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    2,
+    "LINE 'C5' .9",
+    "Repeat value extends past the last line - line 000009"
+   ],
+   [
+    2,
+    "LINE 'A' .1",
+    "Repeat value extends past the last line - line 000009"
+   ]
+  ]
+ },
+ "pseudo labels SORT .3 .6": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "SORT .3 .6"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "    delta four",
+   "epsilon five",
+   "gamma three",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "SORT .3 .6",
+    "SORT Complete"
+   ]
+  ]
+ },
+ "pseudo labels UC .2 .4": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "UC .2 .4"
+  ],
+  "output": [
+   "alpha one",
+   "  BETA TWO",
+   "GAMMA THREE",
+   "    DELTA FOUR",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "UC .2 .4",
+    "3 lines altered"
+   ]
+  ]
+ },
+ "pseudo labels C ALL .2 .4": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "C ALL e E .2 .4"
+  ],
+  "output": [
+   "alpha one",
+   "  bEta two",
+   "gamma thrEE",
+   "    dElta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    0,
+    "C ALL e E .2 .4",
+    "CHARS e triggered change processing 4 times in 3 lines"
+   ]
+  ]
+ },
+ "pseudo label past end": {
+  "input": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "commands": [
+   "UC .2 .15"
+  ],
+  "output": [
+   "alpha one",
+   "  beta two",
+   "gamma three",
+   "    delta four",
+   "epsilon five",
+   "zeta six",
+   "eta seven",
+   "theta eight",
+   "iota nine",
+   "kappa ten"
+  ],
+  "log": [
+   [
+    8,
+    "UC .2 .15",
+    "Line reference .15 is undefined"
+   ]
+  ]
+ },
+ "primary UC ALL": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "UC ALL"
+  ],
+  "output": [
+   "HELLO WORLD",
+   "MIXED CASE LINE",
+   "LOWER ONLY",
+   "UPPER ONLY"
+  ],
+  "log": [
+   [
+    0,
+    "UC ALL",
+    "4 lines altered"
+   ]
+  ]
+ },
+ "primary LC .ZF .ZL": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "LC .ZF .ZL"
+  ],
+  "output": [
+   "hello world",
+   "mixed case line",
+   "lower only",
+   "upper only"
+  ],
+  "log": [
+   [
+    0,
+    "LC .ZF .ZL",
+    "4 lines altered"
+   ]
+  ]
+ },
+ "primary UC labels": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "LINE '.AA' .2",
+   "LINE '.BB' .3",
+   "UC .AA .BB"
+  ],
+  "output": [
+   "Hello World",
+   "MIXED CASE LINE",
+   "LOWER ONLY",
+   "UPPER ONLY"
+  ],
+  "log": [
+   [
+    0,
+    "LINE '.AA' .2",
+    "'.AA' applied"
+   ],
+   [
+    0,
+    "LINE '.BB' .3",
+    "'.BB' applied"
+   ],
+   [
+    0,
+    "UC .AA .BB",
+    "2 lines altered"
+   ]
+  ]
+ },
+ "primary UC one label": {
+  "input": [
+   "Hello World",
+   "MIXED Case line",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "commands": [
+   "UC .2"
+  ],
+  "output": [
+   "Hello World",
+   "MIXED CASE LINE",
+   "lower only",
+   "UPPER ONLY"
+  ],
+  "log": [
+   [
+    0,
+    "UC .2",
+    "1 line altered"
+   ]
+  ]
+ }
+}
