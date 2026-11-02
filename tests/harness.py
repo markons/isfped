@@ -158,6 +158,62 @@ class EditorDriver:
         return Path(self.ed.filename).read_text().split("\n")
 
 
+class AppDriver:
+    """The tabbed window (EditorApp), invisible, with the same dialog fakes."""
+
+    def __init__(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self._patches = [
+            mock.patch.object(isfped.messagebox, "askyesno", return_value=True),
+            mock.patch.object(isfped.messagebox, "askyesnocancel", return_value=False),
+            mock.patch.object(isfped.messagebox, "showerror"),
+            mock.patch.object(isfped.filedialog, "askopenfilename", return_value=""),
+            mock.patch.object(isfped.ISPFEditor, "_close_command_window"),
+            # Every tab's recent-files list stays out of the repository
+            mock.patch.object(isfped.Path, "with_name", return_value=self.tmp / "recent.json"),
+        ]
+        for p in self._patches:
+            p.start()
+        self.root = tk.Tk()
+        self.root.attributes("-alpha", 0.0)
+        self.app = isfped.EditorApp(self.root)
+        self.app.new_tab()
+        self.root.update()
+
+    def close(self):
+        try:
+            self.root.destroy()
+        except tk.TclError:
+            pass
+        for p in reversed(self._patches):
+            p.stop()
+        self._tmp.cleanup()
+
+    def file(self, name, lines=("x",)):
+        path = self.tmp / name
+        path.write_text("\n".join(lines), encoding="utf-8")
+        return path
+
+    def primary(self, command):
+        """Type a primary command in the current tab and press Enter."""
+        ed = self.app.current
+        ed.cmd_entry.delete(0, tk.END)
+        ed.cmd_entry.insert(0, command)
+        ed.process_primary_command(SimpleNamespace(widget=ed.cmd_entry))
+        try:
+            self.root.update()
+            return ed.status.cget("text")
+        except tk.TclError:     # END closed the tab or the window
+            return None
+
+    @property
+    def tabs(self):
+        """Tab titles, in order."""
+        nb = self.app.notebook
+        return [nb.tab(t, "text") for t in nb.tabs()]
+
+
 def run_case(lines, steps):
     """Run a scenario from cases.py; return (saved lines, status after each step)."""
     d = EditorDriver(lines)

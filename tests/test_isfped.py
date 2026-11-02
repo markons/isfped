@@ -2,6 +2,7 @@
 
 Run:  python -m unittest discover -s tests -v
 """
+import os
 import sys
 import tkinter as tk
 import unittest
@@ -10,7 +11,7 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cases import BASE, MIXED  # noqa: E402
-from harness import EditorDriver  # noqa: E402
+from harness import AppDriver, EditorDriver, isfped  # noqa: E402
 
 
 class EditorTest(unittest.TestCase):
@@ -60,8 +61,8 @@ class LineCommandParsing(EditorTest):
         self.assertIn("by themselves", status)
         self.assertEqual(self.d.lines, BASE)
 
-    def test_cols_not_supported_but_harmless(self):
-        status = self.d.line_cmds({2: "COLS"})
+    def test_bounds_not_supported_but_harmless(self):
+        status = self.d.line_cmds({2: "BOUNDS"})
         self.assertIn("not supported", status)
         self.assertEqual(self.d.lines, BASE)
 
@@ -335,6 +336,47 @@ class Find(EditorTest):
         self.assertIn("2 occurrence", self.d.primary("F ALL only"))
         self.assertIn("1 occurrence", self.d.primary("F ALL 'r o'"))
 
+    def test_find_picture_strings(self):
+        self.d.load(["ab12 X-9", "Zz 3.5 _", "\tq"])
+        cases = {"P'#'": 5, "P'##'": 1, "P'@'": 6, "P'<'": 4, "P'>'": 2,
+                 "P'$'": 3, "P'^'": 15, "P'.'": 1, "P'#.#'": 0, "P'@-#'": 3,
+                 "P'b='": 1, "P'B#'": 1}
+        for picture, count in cases.items():
+            with self.subTest(picture=picture):
+                self.assertIn(f"{count} occurrence", self.d.primary(f"F ALL {picture}"))
+
+    def test_find_picture_with_word_and_columns(self):
+        self.d.load(["12 123 1234", "x99"])
+        self.assertIn("1 occurrence", self.d.primary("F ALL P'###' WORD"))
+        self.assertIn("1 occurrence", self.d.primary("F ALL P'##' 2 3"))
+
+    def test_find_picture_skips_cols_row(self):
+        self.d.line_cmds({1: "COLS"})
+        self.assertIn("0 occurrence", self.d.primary("F ALL P'#'"))
+
+    def test_change_picture(self):
+        self.d.load(["a1 b22 c3"])
+        self.d.primary("C ALL P'@#' 'X'")
+        self.assertEqual(self.d.lines, ["X X2 X"])
+
+    def test_change_picture_to_string_keeps_and_cases(self):
+        self.d.load(["abc DEF ghi"])
+        self.d.primary("C ALL P'<<<' P'>=<'")
+        self.assertEqual(self.d.lines, ["Abc DEF Ghi"])
+        self.assertIn("as long", self.d.primary("C ALL P'@' P'=='"))
+
+    def test_rchange_repeats_picture(self):
+        self.d.load(["x1 x2"])
+        self.d.ed.text.mark_set("insert", "1.0")
+        self.d.primary("C P'@#' P'>='")
+        self.d.primary("RCHANGE")
+        self.assertEqual(self.d.lines, ["X1 X2"])
+
+    def test_exclude_picture(self):
+        self.d.load(["abc", "a1c", "xyz", "b2d"])
+        self.d.primary("X P'@#@' ALL")
+        self.assertEqual(self.d.excluded, {2, 4})
+
     def test_find_x_nx(self):
         self.d.line_cmds({1: "XX", 5: "XX"})
         self.assertIn("8 occurrence", self.d.primary("F ALL e NX"))
@@ -543,6 +585,25 @@ class DeleteSortPrimary(EditorTest):
         self.assertIn("undefined", self.d.primary("UC .2 .15"))
         self.assertEqual(self.d.lines, BASE)
 
+    def test_cols_ruler_shown_not_saved(self):
+        self.d.line_cmds({2: "COLS"})
+        self.assertTrue(self.d.lines[2].startswith("=COLS>----+----1----+----2"))
+        self.assertEqual(self.d.gutter[2], "=COLS>")
+        self.assertEqual(self.d.data, BASE)
+        self.d.primary("RESET")
+        self.assertEqual(self.d.lines, BASE)
+
+    def test_cols_ruler_deleted_with_d(self):
+        self.d.line_cmds({1: "COLS"})
+        self.d.line_cmds({2: "D"})
+        self.assertEqual(self.d.lines, BASE)
+
+    def test_cols_on_excluded_block_goes_after_block(self):
+        self.d.line_cmds({2: "XX", 4: "XX"})
+        self.d.line_cmds({2: "COLS"})
+        self.assertTrue(self.d.lines[4].startswith("=COLS>"))
+        self.assertEqual(self.d.data, BASE)
+
     def test_uc_without_range_changes_nothing(self):
         self.assertIn("pending line range", self.d.primary("UC"))
         self.assertEqual(self.d.lines, BASE)
@@ -646,6 +707,183 @@ class PrimaryMisc(EditorTest):
         self.d.ed.scroll_entry.insert(0, "h")
         self.d.ed._set_scroll_mode()
         self.assertEqual(self.d.ed.scroll_mode, "HALF")
+
+
+
+HEX_ALPHA = ["=HEX> 667662666", "=HEX> 1C0810FE5"]   # "alpha one"
+
+
+class HexMode(EditorTest):
+    def test_hex_on_rows_under_every_line_not_saved(self):
+        self.assertIn("HEX ON", self.d.primary("HEX ON"))
+        self.assertEqual(len(self.d.lines), 3 * len(BASE))
+        self.assertEqual(self.d.lines[0:3], [BASE[0]] + HEX_ALPHA)
+        self.assertEqual(self.d.data, BASE)
+        self.assertFalse(self.d.ed._dirty)
+
+    def test_hex_alone_is_on_and_off_removes(self):
+        self.d.primary("HEX")
+        self.assertTrue(self.d.ed.hex_mode)
+        self.assertIn("HEX OFF", self.d.primary("HEX OFF"))
+        self.assertEqual(self.d.lines, BASE)
+
+    def test_hex_bad_operands(self):
+        self.assertIn("not supported", self.d.primary("HEX DATA"))
+        self.assertIn("HEX ON, HEX OFF", self.d.primary("HEX ON OFF"))
+        self.assertEqual(self.d.lines, BASE)
+
+    def test_hex_rows_follow_change(self):
+        self.d.primary("HEX ON")
+        self.d.primary("C ALL alpha ALPHA")
+        self.assertEqual(self.d.lines[0:3],
+                         ["ALPHA one", "=HEX> 445442666", "=HEX> 1C0810FE5"])
+
+    def test_hex_rows_follow_line_commands(self):
+        self.d.primary("HEX ON")
+        self.d.line_cmds({1: "D"})                 # delete "alpha one"
+        self.assertEqual(self.d.data, BASE[1:])
+        self.assertEqual(len(self.d.lines), 3 * (len(BASE) - 1))
+        self.d.line_cmds({1: "R"})                 # repeat "  beta two"
+        self.assertEqual(self.d.lines[3], BASE[1])
+        self.assertTrue(self.d.lines[4].startswith("=HEX> 2"))
+
+    def test_insert_in_hex_mode_lands_on_new_line(self):
+        self.d.primary("HEX ON")
+        self.d.line_cmds({1: "I"})
+        # alpha one, its two hex rows, then the inserted line (no hex rows)
+        self.assertEqual(self.d.lines[0:4], [BASE[0]] + HEX_ALPHA + [""])
+        self.assertEqual(self.d.ed.get_temp_lines(), {4})
+        self.assertEqual(self.d.insert, "4.0")
+
+    def test_hex_rows_of_excluded_line_are_excluded(self):
+        self.d.primary("HEX ON")
+        self.d.line_cmds({1: "X"})
+        self.assertEqual(self.d.excluded, {1, 2, 3})
+
+    def test_hex_on_kept_for_next_file(self):
+        self.d.primary("HEX ON")
+        self.d.load(["ab"])
+        self.assertEqual(self.d.lines, ["ab", "=HEX> 66", "=HEX> 12"])
+        self.assertIn("Nothing to undo", self.d.primary("UNDO"))
+
+
+class MakeData(EditorTest):
+    def test_md_turns_cols_row_into_data(self):
+        self.d.line_cmds({1: "COLS"})
+        self.assertIn("1 line(s) made data", self.d.line_cmds({2: "MD"}))
+        self.assertTrue(self.d.data[1].startswith("----+----1"))
+        self.assertEqual(len(self.d.data), len(BASE) + 1)
+
+    def test_mdd_block_turns_hex_rows_into_data(self):
+        self.d.line_cmds({1: "HX"})
+        self.d.line_cmds({2: "MDD", 3: "MDD"})
+        self.assertEqual(self.d.data[:3], [BASE[0], "667662666", "1C0810FE5"])
+
+    def test_md_on_data_line_changes_nothing(self):
+        self.assertIn("0 line(s) made data", self.d.line_cmds({1: "MD"}))
+        self.assertEqual(self.d.lines, BASE)
+
+    def test_md_makes_compare_removed_line_data(self):
+        self.d.line_cmds({2: "D"})
+        self.d.primary("COMPARE *")
+        row = self.d.lines.index(BASE[1]) + 1
+        self.d.line_cmds({row: "MD"})
+        self.assertEqual(self.d.data, BASE)
+
+    def test_compare_rows_survive_other_line_commands(self):
+        self.d.line_cmds({2: "D"})
+        self.d.primary("COMPARE *")
+        self.d.line_cmds({10: "D"})                # delete "kappa ten"
+        self.assertNotIn(BASE[1], self.d.data)     # still a display row
+        self.assertIn(BASE[1], self.d.lines)
+
+
+class FilePath(EditorTest):
+    def test_full_path_shown_and_copied(self):
+        path = os.path.abspath(self.d.ed.filename)
+        self.assertEqual(self.d.ed.path_var.get(), path)
+        self.d.ed.copy_path()
+        self.assertEqual(self.d.root.clipboard_get(), path)
+        self.assertIn("data.txt", self.d.root.title())
+
+    def test_title_marks_unsaved_changes(self):
+        self.d.primary("C ALL alpha ALPHA")
+        self.assertIn("data.txt *", self.d.root.title())
+        self.d.primary("SAVE")
+        self.assertNotIn("*", self.d.root.title())
+
+
+class Tabs(unittest.TestCase):
+    def setUp(self):
+        self.a = AppDriver()
+
+    def tearDown(self):
+        self.a.close()
+
+    def test_edit_opens_files_in_tabs(self):
+        one, two = self.a.file("one.txt"), self.a.file("two.txt")
+        self.a.primary(f'EDIT "{one}"')            # the empty first tab is reused
+        self.a.primary(f'EDIT "{two}"')
+        self.assertEqual(self.a.tabs, ["one.txt", "two.txt"])
+        self.assertEqual(self.a.app.current.filename, str(two))
+        self.assertIn("two.txt", self.a.root.title())
+
+    def test_open_file_twice_goes_to_its_tab(self):
+        one, two = self.a.file("one.txt"), self.a.file("two.txt")
+        self.a.app.open(str(one))
+        self.a.app.open(str(two))
+        self.a.app.open(str(one))
+        self.assertEqual(len(self.a.tabs), 2)
+        self.assertEqual(self.a.app.current.filename, str(one))
+
+    def test_swap_and_end_closes_tab(self):
+        for name in ("a.txt", "b.txt", "c.txt"):
+            self.a.app.open(str(self.a.file(name)))
+        self.a.primary("SWAP NEXT")                # wraps to the first tab
+        self.assertTrue(self.a.app.current.filename.endswith("a.txt"))
+        self.a.primary("SWAP 2")
+        self.assertTrue(self.a.app.current.filename.endswith("b.txt"))
+        self.a.primary("END")
+        self.assertEqual(self.a.tabs, ["a.txt", "c.txt"])
+        self.assertTrue(self.a.root.winfo_exists())
+
+    def test_tabs_keep_their_own_state(self):
+        self.a.app.open(str(self.a.file("a.txt", ["one", "two"])))
+        self.a.app.open(str(self.a.file("b.txt", ["three"])))
+        self.a.primary("HEX ON")
+        self.a.primary("SWAP PREV")
+        self.assertFalse(self.a.app.current.hex_mode)
+        self.assertEqual(self.a.app.current.text.get("1.0", "end-1c"), "one\ntwo")
+
+    def test_dirty_tab_title(self):
+        self.a.app.open(str(self.a.file("a.txt", ["one"])))
+        self.a.primary("C one ONE")
+        self.assertEqual(self.a.tabs, ["a.txt *"])
+
+    def test_end_on_last_tab_closes_window(self):
+        self.a.primary("END")
+        with self.assertRaises(tk.TclError):
+            self.a.root.winfo_exists()
+
+    def test_command_window_closed_only_with_the_last_tab(self):
+        close_console = isfped.ISPFEditor._close_command_window   # the harness's mock
+        self.a.app.open(str(self.a.file("a.txt")))
+        self.a.app.open(str(self.a.file("b.txt")))
+        self.a.primary("END")
+        close_console.assert_not_called()
+        self.a.primary("END")
+        close_console.assert_called_once()
+
+    def test_cancel_and_window_close_close_command_window(self):
+        close_console = isfped.ISPFEditor._close_command_window
+        self.a.primary("CANCEL")
+        close_console.assert_called_once()
+        a = AppDriver()
+        try:
+            a.app.close_all()                      # the window's X
+            isfped.ISPFEditor._close_command_window.assert_called_once()
+        finally:
+            a.close()
 
 
 if __name__ == "__main__":

@@ -7,21 +7,22 @@ Line commands are entered DIRECTLY on the line number gutter.
 import re
 import json
 import os
+import sys
 import textwrap
 import tkinter as tk
 import tkinter.font as tkfont
 from pathlib import Path
 from difflib import SequenceMatcher
 from collections import defaultdict
-from tkinter import filedialog, messagebox, simpledialog
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 # Line command syntax: optional count before or after the command (D3, 3D, ))4)
 LINE_CMD_RE = re.compile(
-    r"^(\d*)(UCC|LCC|UC|LC|DD|CC|MM|RR|XX|OO|<<|>>|HX|TS|TF|TE|\(\(|\)\)|[IDRCMABOXFLS<>()])(\d*)$")
+    r"^(\d*)(UCC|LCC|UC|LC|MDD|MD|DD|CC|MM|RR|XX|OO|<<|>>|HX|TS|TF|TE|\(\(|\)\)|[IDRCMABOXFLS<>()])(\d*)$")
 # Block commands and the single-line command they act like
 BLOCK_CMDS = {"DD": "D", "CC": "C", "MM": "M", "RR": "R", "XX": "X",
               "UCC": "UC", "LCC": "LC", "((": "(", "))": ")",
-              "<<": "<", ">>": ">", "OO": "O"}
+              "<<": "<", ">>": ">", "OO": "O", "MDD": "MD"}
 # Line label: period followed by 1-5 letters, so it fits the 6-column number area
 # (labels starting with Z are reserved)
 LABEL_RE = re.compile(r"^\.[A-Z]{1,5}$")
@@ -31,15 +32,79 @@ LABEL_MARK = "lbl."     # Tk mark per label: lbl.NAME
 EXCLUDE_MARK = "xcl."   # Tk mark per excluded line: xcl.<n>
 TEMP_MARK = "tmp."      # Tk mark per temporary inserted line (I, TS): tmp.<n>
 TEMP_FIELD = "'" * FIELD_WIDTH
+# Display-only rows (HX hex rows, COLS ruler): shown in the text, never saved.
+# Each prefix is FIELD_WIDTH long and hidden, so the row's data starts in column 1.
+HEX_PREFIX = "=HEX> "
+COLS_PREFIX = "=COLS>"
+INFO_PREFIXES = (HEX_PREFIX, COLS_PREFIX)
+
+
+def cols_ruler(width):
+    """ISPF column ruler ----+----1----+----2... for columns 1..width."""
+    return "".join(str(c // 10 % 10) if c % 10 == 0 else "+" if c % 5 == 0 else "-"
+                   for c in range(1, width + 1))
+
+
+def build_menubar(root, editor, app=None):
+    """The window's menu bar. editor() is the editor its commands act on (with
+    tabs, the current one); app: the EditorApp, for the tab commands.
+    Returns (menubar, file menu, recent files menu, index of the compare entry)."""
+    menubar = tk.Menu(root)
+    file_menu = tk.Menu(menubar, tearoff=0)
+    if app:
+        file_menu.add_command(label="New Tab", command=app.new_tab)
+    file_menu.add_command(label="Open (Edit)", command=lambda: editor().edit_file("EDIT"))
+    file_menu.add_command(label="Open (Browse)", command=lambda: editor().edit_file("BROWSE"))
+    file_menu.add_command(label="Open (View)", command=lambda: editor().edit_file("VIEW"))
+    file_menu.add_separator()
+    recent_files_menu = tk.Menu(file_menu, tearoff=0)
+    file_menu.add_cascade(label="Recent Files", menu=recent_files_menu)
+    file_menu.add_command(label="Select File to Compare...",
+                          command=lambda: editor().select_compare_file())
+    file_menu.add_command(label="Compare with Selected File",
+                          command=lambda: editor().compare_selected_file(), state=tk.DISABLED)
+    compare_index = file_menu.index(tk.END)
+    file_menu.add_separator()
+    file_menu.add_command(label="Save", command=lambda: editor().save_file())
+    file_menu.add_command(label="Save As...", command=lambda: editor().save_as())
+    file_menu.add_command(label="Copy Full Path", command=lambda: editor().copy_path())
+    file_menu.add_separator()
+    if app:
+        file_menu.add_command(label="Close Tab (END)", command=lambda: editor().end_editor())
+        file_menu.add_command(label="Exit", command=app.close_all)
+    else:
+        file_menu.add_command(label="Exit", command=root.quit)
+    menubar.add_cascade(label="File", menu=file_menu)
+
+    edit_menu = tk.Menu(menubar, tearoff=0)
+    edit_menu.add_command(label="Find (FIND)", command=lambda: editor().find_text())
+    edit_menu.add_command(label="Change (CHANGE)", command=lambda: editor().change_text())
+    edit_menu.add_separator()
+    edit_menu.add_command(label="Upper Case (UC)", command=lambda: editor().change_case("upper"))
+    edit_menu.add_command(label="Lower Case (LC)", command=lambda: editor().change_case("lower"))
+    edit_menu.add_separator()
+    edit_menu.add_command(label="Undo", command=lambda: editor().undo())
+    edit_menu.add_command(label="Redo", command=lambda: editor().redo())
+    menubar.add_cascade(label="Edit", menu=edit_menu)
+
+    help_menu = tk.Menu(menubar, tearoff=0)
+    help_menu.add_command(label="Help", command=lambda: editor().show_help())
+    menubar.add_cascade(label="Help", menu=help_menu)
+    return menubar, file_menu, recent_files_menu, compare_index
 
 
 class ISPFEditor:
     PF12_ACTION = "RETRIEVE"  # Change to "CANCEL" for the alternate ISPF setup.
 
-    def __init__(self, root):
+    def __init__(self, root, parent=None, app=None):
+        """root: the Tk root. parent/app: the tab frame and EditorApp when the
+        editor is one tab of several; without them it fills the window alone."""
         self.root = root
-        self.root.title("ISPF Editor - Python/Tk")
-        self.root.geometry("900x600")
+        self.app = app
+        self.frame = parent or root
+        if app is None:
+            self.root.title("ISPF Editor - Python/Tk")
+            self.root.geometry("900x600")
 
         # Editor state
         self.filename = None
@@ -73,14 +138,69 @@ class ISPFEditor:
         self._build_ui()
         self._bind_keys()
         self.refresh_gutter()
+        self._update_title()
         self.root.after_idle(self._update_ispf_header)
         # Like ISPF, start on the command line; also when the window itself gets focus
         self.cmd_entry.focus_set()
-        self.root.bind("<FocusIn>", self._on_root_focus)
+        if app is None:
+            self.root.bind("<FocusIn>", self._on_root_focus)
 
     def _on_root_focus(self, event):
         if event.widget is self.root:
             self.cmd_entry.focus_set()
+
+    @property
+    def _dirty(self):
+        return self.__dirty
+
+    @_dirty.setter
+    def _dirty(self, value):
+        # The tab title shows whether there are unsaved changes
+        changed = value != getattr(self, "_ISPFEditor__dirty", None)
+        self.__dirty = value
+        if changed and hasattr(self, "path_var"):
+            self._update_title()
+
+    def _update_title(self):
+        """Show the file's full path (copyable) and name it in the title or tab."""
+        path = os.path.abspath(self.filename) if self.filename else ""
+        self.path_var.set(path or "(no file)")
+        self.mode_label.config(text=self.mode)
+        name = (Path(path).name if path else "(new)") + (" *" if self._dirty else "")
+        if self.app:
+            self.app.update_tab(self, name, path)
+        else:
+            self.root.title(f"{name} - ISPF Editor" if path else "ISPF Editor - Python/Tk")
+
+    def copy_path(self):
+        """Put the edited file's full path on the clipboard."""
+        if not self.filename:
+            self.status.config(text="No file - nothing to copy")
+            return
+        path = os.path.abspath(self.filename)
+        self.root.clipboard_clear()
+        self.root.clipboard_append(path)
+        self.status.config(text=f"Path copied: {path}")
+
+    def is_empty(self):
+        """A new, untouched editor (a file can be opened in it instead of a new tab)."""
+        return not self.filename and not self._dirty and not self.text.get("1.0", "end-1c")
+
+    def edit_file(self, mode="EDIT", path=None):
+        """Open a file: in its own tab when there are tabs, otherwise here."""
+        if self.app is None:
+            return self.open_file(mode, path)
+        path = path or filedialog.askopenfilename(parent=self.root)
+        if path:
+            self.app.open(path, mode)
+
+    def _close(self):
+        """Close this editor: its tab, or - the last one - the window and the
+        cmd.exe window that started it (END, CANCEL, Exit or the window's X)."""
+        if self.app and self.app.close_tab(self):
+            return
+        self._close_command_window()
+        self.root.destroy()
 
     def _set_scroll_mode(self, event=None):
         value = self.scroll_entry.get().strip().upper()
@@ -103,15 +223,7 @@ class ISPFEditor:
             return
         columns = self._visible_columns()
         first = self._left_column()
-        ruler = []
-        for column in range(first, first + columns):
-            if column % 10 == 0:
-                ruler.append(str((column // 10) % 10))
-            elif column % 5 == 0:
-                ruler.append("+")
-            else:
-                ruler.append("-")
-        self.ruler_data.config(text="".join(ruler))
+        self.ruler_data.config(text=cols_ruler(first + columns - 1)[first - 1:])
 
         width = FIELD_WIDTH + columns
         caption = " Top of Data "
@@ -131,8 +243,21 @@ class ISPFEditor:
     # ------------------------------------------------------------------
     def _build_ui(self):
         """Build the complete editor interface."""
-        # Command line (top)
-        self.cmd_frame = tk.Frame(self.root)
+        # File row (top): mode and the full path, selectable for copying
+        path_frame = tk.Frame(self.frame)
+        path_frame.pack(fill=tk.X, padx=2, pady=(2, 0))
+        self.mode_label = tk.Label(path_frame, text=self.mode, width=7, anchor=tk.W,
+                                   font=("Courier", 10, "bold"))
+        self.mode_label.pack(side=tk.LEFT)
+        self.path_var = tk.StringVar(value="(no file)")
+        self.path_entry = tk.Entry(path_frame, textvariable=self.path_var, state="readonly",
+                                   font=("Courier", 10), relief=tk.FLAT, takefocus=0)
+        self.path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        tk.Button(path_frame, text="Copy path", command=self.copy_path, takefocus=0,
+                  padx=4, pady=0).pack(side=tk.RIGHT)
+
+        # Command line
+        self.cmd_frame = tk.Frame(self.frame)
         self.cmd_frame.pack(fill=tk.X, padx=2, pady=2)
         tk.Label(self.cmd_frame, text="Command >", font=("Courier", 10)).pack(side=tk.LEFT)
         self.cmd_entry = tk.Entry(self.cmd_frame, font=("Courier", 10))
@@ -146,7 +271,7 @@ class ISPFEditor:
         self.scroll_entry.bind("<Return>", self._set_scroll_mode)
 
         # ISPF-style fixed header rows, aligned with the gutter and data area.
-        self.ruler_frame = tk.Frame(self.root, bg="white")
+        self.ruler_frame = tk.Frame(self.frame, bg="white")
         self.ruler_frame.pack(fill=tk.X, padx=2)
         self.ruler_gutter = tk.Label(self.ruler_frame, text="=<COLS>", width=FIELD_WIDTH,
                                      font=("Courier", 10), bg="white", anchor=tk.W,
@@ -155,7 +280,7 @@ class ISPFEditor:
         self.ruler_data = tk.Label(self.ruler_frame, text="", font=("Courier", 10),
                                    bg="white", anchor=tk.W, padx=0, bd=0)
         self.ruler_data.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.boundary_frame = tk.Frame(self.root, bg="white")
+        self.boundary_frame = tk.Frame(self.frame, bg="white")
         self.boundary_frame.pack(fill=tk.X, padx=2)
         self.boundary_gutter = tk.Label(self.boundary_frame, text="******", width=FIELD_WIDTH,
                                         font=("Courier", 10), bg="white", anchor=tk.W,
@@ -166,7 +291,7 @@ class ISPFEditor:
         self.boundary_data.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # Main area
-        self.main_frame = tk.Frame(self.root)
+        self.main_frame = tk.Frame(self.frame)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Line number gutter - EDITABLE for direct command entry
@@ -203,52 +328,25 @@ class ISPFEditor:
         self.text.config(yscrollcommand=self._on_text_yscroll)
         self.line_numbers.config(yscrollcommand=self._on_gutter_yscroll)
 
-        self.xscroll = tk.Scrollbar(self.root, command=self.text.xview, orient=tk.HORIZONTAL)
+        self.xscroll = tk.Scrollbar(self.frame, command=self.text.xview, orient=tk.HORIZONTAL)
         self.xscroll.pack(fill=tk.X)
         self.text.config(xscrollcommand=self._on_text_xscroll)
 
         # Status line
-        self.status = tk.Label(self.root, text="", anchor=tk.W, relief=tk.SUNKEN,
+        self.status = tk.Label(self.frame, text="", anchor=tk.W, relief=tk.SUNKEN,
                                font=("Courier", 9))
         self.status.pack(fill=tk.X)
 
-        # Menu bar
-        menubar = tk.Menu(self.root)
-        file_menu = tk.Menu(menubar, tearoff=0)
-        file_menu.add_command(label="Open (Edit)", command=lambda: self.open_file("EDIT"))
-        file_menu.add_command(label="Open (Browse)", command=lambda: self.open_file("BROWSE"))
-        file_menu.add_command(label="Open (View)", command=lambda: self.open_file("VIEW"))
-        file_menu.add_separator()
-        self.recent_files_menu = tk.Menu(file_menu, tearoff=0)
-        file_menu.add_cascade(label="Recent Files", menu=self.recent_files_menu)
+        # Menu bar: one per window (with tabs, EditorApp's acts on the current tab)
+        if self.app is None:
+            menubar, self.file_menu, self.recent_files_menu, self.compare_selected_menu_index = (
+                build_menubar(self.root, lambda: self))
+            self.root.config(menu=menubar)
+        else:
+            self.file_menu = self.app.file_menu
+            self.recent_files_menu = self.app.recent_files_menu
+            self.compare_selected_menu_index = self.app.compare_selected_menu_index
         self._refresh_recent_files_menu()
-        file_menu.add_command(label="Select File to Compare...", command=self.select_compare_file)
-        file_menu.add_command(label="Compare with Selected File", command=self.compare_selected_file,
-                              state=tk.DISABLED)
-        self.compare_selected_menu_index = file_menu.index(tk.END)
-        file_menu.add_separator()
-        file_menu.add_command(label="Save", command=self.save_file)
-        file_menu.add_command(label="Save As...", command=self.save_as)
-        file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.root.quit)
-        menubar.add_cascade(label="File", menu=file_menu)
-        self.file_menu = file_menu
-
-        edit_menu = tk.Menu(menubar, tearoff=0)
-        edit_menu.add_command(label="Find (FIND)", command=lambda: self.find_text())
-        edit_menu.add_command(label="Change (CHANGE)", command=lambda: self.change_text())
-        edit_menu.add_separator()
-        edit_menu.add_command(label="Upper Case (UC)", command=lambda: self.change_case("upper"))
-        edit_menu.add_command(label="Lower Case (LC)", command=lambda: self.change_case("lower"))
-        edit_menu.add_separator()
-        edit_menu.add_command(label="Undo", command=self.undo)
-        edit_menu.add_command(label="Redo", command=self.redo)
-        menubar.add_cascade(label="Edit", menu=edit_menu)
-
-        help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label="Help", command=self.show_help)
-        menubar.add_cascade(label="Help", menu=help_menu)
-        self.root.config(menu=menubar)
 
     def _bind_keys(self):
         """Bind keyboard events."""
@@ -260,41 +358,64 @@ class ISPFEditor:
         self.text.bind("<Return>", self._text_return)
         # The 3270 Enter key, as in SPFLite's keymap: Right Ctrl, keypad Enter and
         # Shift/Ctrl/Alt+Enter always process the screen and never just move the cursor
+        # (a bind tag of its own per editor: each tab has its own Right Ctrl state)
+        watch = f"RCtrlWatch{id(self)}"
         for widget in (self.cmd_entry, self.line_numbers, self.text):
-            widget.bindtags(("RCtrlWatch",) + widget.bindtags())
+            widget.bindtags((watch,) + widget.bindtags())
             widget.bind("<KeyRelease-Control_R>", self._right_ctrl_release)
             for key in ("<KP_Enter>", "<Shift-Return>", "<Control-Return>", "<Alt-Return>"):
                 widget.bind(key, self._attention)
-        self.root.bind_class("RCtrlWatch", "<KeyPress>", self._watch_right_ctrl)
+        self.root.bind_class(watch, "<KeyPress>", self._watch_right_ctrl)
         # Ctrl+Z / Ctrl+Y: restore labels and excluded lines after the text is undone
         # (runs before Tk's own undo, so the page shown now can be kept)
         self.text.bind("<<Undo>>", self._on_undo_redo)
         self.text.bind("<<Redo>>", self._on_undo_redo)
         self.text.bind("<Button-1>", self.update_status)
         self.text.bind("<ButtonRelease-1>", self.update_status)
-        # ISPF-style navigation: Home -> command line, Tab moves between
-        # line command area and text area
-        for widget in (self.root, self.text, self.line_numbers, self.cmd_entry):
-            widget.bind("<Home>", self._home_to_command)
-            # PgUp/F7 and PgDn/F8 scroll 20 lines (replaces Tk's own paging)
-            for key in ("<Prior>", "<F7>"):
-                widget.bind(key, lambda e: self._scroll_key("UP"))
-            for key in ("<Next>", "<F8>"):
-                widget.bind(key, lambda e: self._scroll_key("DOWN"))
-            widget.bind("<F1>", lambda e: self._invoke_pf(self.show_help))
-            widget.bind("<F3>", lambda e: self._invoke_pf(self.end_editor))
-            widget.bind("<F5>", lambda e: self._invoke_pf(self.repeat_find))
-            widget.bind("<F6>", lambda e: self._invoke_pf(self.repeat_change))
-            widget.bind("<F10>", lambda e: self._invoke_pf(lambda: self.scroll_horizontal("LEFT", "PAGE")))
-            widget.bind("<F11>", lambda e: self._invoke_pf(lambda: self.scroll_horizontal("RIGHT", "PAGE")))
-            widget.bind("<F12>", lambda e: self._invoke_pf(self._pf12))
+        # ISPF-style navigation: Home -> command line, PF keys; with tabs the
+        # window-level keys are EditorApp's and act on the current tab
+        widgets = (self.text, self.line_numbers, self.cmd_entry)
+        for widget in widgets if self.app else widgets + (self.root,):
+            for key, handler in self._window_keys().items():
+                widget.bind(key, handler)
+        # Tab moves between line command area and text area
         self.text.bind("<Tab>", self._tab_from_text)
         self.text.bind("<Shift-Tab>", self._backtab_from_text)
         self.line_numbers.bind("<Tab>", self._tab_from_gutter)
         self.line_numbers.bind("<Shift-Tab>", self._backtab_from_gutter)
         self.cmd_entry.bind("<Tab>", self._tab_from_command)
-        self.root.bind("<Control-s>", lambda e: self.save_file())
-        self.root.bind("<Control-f>", lambda e: self.find_text())
+        if self.app is None:
+            for key, handler in self._root_keys().items():
+                self.root.bind(key, handler)
+
+    def _window_keys(self):
+        """Keys that work in every part of the editor: {sequence: handler}."""
+        keys = {"<Home>": self._home_to_command}
+        # PgUp/F7 and PgDn/F8 scroll 20 lines (replaces Tk's own paging)
+        for key in ("<Prior>", "<F7>"):
+            keys[key] = lambda e: self._scroll_key("UP")
+        for key in ("<Next>", "<F8>"):
+            keys[key] = lambda e: self._scroll_key("DOWN")
+        keys.update({
+            "<F1>": lambda e: self._invoke_pf(self.show_help),
+            "<F3>": lambda e: self._invoke_pf(self.end_editor),
+            "<F5>": lambda e: self._invoke_pf(self.repeat_find),
+            "<F6>": lambda e: self._invoke_pf(self.repeat_change),
+            "<F10>": lambda e: self._invoke_pf(lambda: self.scroll_horizontal("LEFT", "PAGE")),
+            "<F11>": lambda e: self._invoke_pf(lambda: self.scroll_horizontal("RIGHT", "PAGE")),
+            "<F12>": lambda e: self._invoke_pf(self._pf12),
+        })
+        if self.app:
+            # Ctrl+Tab / Ctrl+Shift+Tab: next / previous tab (like SWAP NEXT/PREV)
+            keys["<Control-Tab>"] = lambda e: self._invoke_pf(lambda: self.app.swap("NEXT"))
+            keys["<Control-Shift-Tab>"] = lambda e: self._invoke_pf(lambda: self.app.swap("PREV"))
+        return keys
+
+    def _root_keys(self):
+        """Keys bound on the window itself: {sequence: handler}."""
+        return {**self._window_keys(),
+                "<Control-s>": lambda e: self.save_file(),
+                "<Control-f>": lambda e: self.find_text()}
 
     @staticmethod
     def _invoke_pf(action):
@@ -320,68 +441,90 @@ class ISPFEditor:
 
     def cancel_editor(self):
         if not self._dirty or messagebox.askyesno("Cancel", "Discard changes and exit?"):
-            self.root.destroy()
+            self._close()
 
-    @staticmethod
-    def _close_command_window():
-        """Close a parent cmd.exe window on END; detach otherwise."""
-        if os.name == "nt":
-            try:
-                import ctypes
-                from ctypes import wintypes
+    # Programs between the command window and this script: the py launcher,
+    # a venv's python.exe (which starts the real one), ...
+    PYTHON_LAUNCHERS = {"py.exe", "pyw.exe", "python.exe", "pythonw.exe", "python3.exe"}
 
-                class PROCESSENTRY32W(ctypes.Structure):
-                    _fields_ = [
-                        ("dwSize", wintypes.DWORD),
-                        ("cntUsage", wintypes.DWORD),
-                        ("th32ProcessID", wintypes.DWORD),
-                        ("th32DefaultHeapID", ctypes.c_size_t),
-                        ("th32ModuleID", wintypes.DWORD),
-                        ("cntThreads", wintypes.DWORD),
-                        ("th32ParentProcessID", wintypes.DWORD),
-                        ("pcPriClassBase", wintypes.LONG),
-                        ("dwFlags", wintypes.DWORD),
-                        ("szExeFile", wintypes.WCHAR * 260),
-                    ]
+    @classmethod
+    def _command_shell_pid(cls):
+        """PID of the cmd.exe window that started the editor (also through the
+        py launcher or a venv python.exe), or None."""
+        import ctypes
+        from ctypes import wintypes
 
-                kernel = ctypes.windll.kernel32
-                kernel.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
-                kernel.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
-                kernel.Process32FirstW.argtypes = [wintypes.HANDLE,
-                                                   ctypes.POINTER(PROCESSENTRY32W)]
-                kernel.Process32FirstW.restype = wintypes.BOOL
-                kernel.Process32NextW.argtypes = [wintypes.HANDLE,
-                                                  ctypes.POINTER(PROCESSENTRY32W)]
-                kernel.Process32NextW.restype = wintypes.BOOL
-                kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-                kernel.CloseHandle.restype = wintypes.BOOL
-                kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-                kernel.OpenProcess.restype = wintypes.HANDLE
-                kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
-                kernel.TerminateProcess.restype = wintypes.BOOL
-                snapshot = kernel.CreateToolhelp32Snapshot(0x00000002, 0)
-                parent_name = ""
-                if snapshot != ctypes.c_void_p(-1).value:
-                    entry = PROCESSENTRY32W()
-                    entry.dwSize = ctypes.sizeof(entry)
-                    if kernel.Process32FirstW(snapshot, ctypes.byref(entry)):
-                        while True:
-                            if entry.th32ProcessID == os.getppid():
-                                parent_name = entry.szExeFile.lower()
-                                break
-                            if not kernel.Process32NextW(snapshot, ctypes.byref(entry)):
-                                break
-                    kernel.CloseHandle(snapshot)
+        class PROCESSENTRY32W(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", ctypes.c_size_t),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", wintypes.LONG),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", wintypes.WCHAR * 260),
+            ]
 
-                if parent_name == "cmd.exe":
-                    process = kernel.OpenProcess(0x0001, False, os.getppid())
-                    if process:
-                        kernel.TerminateProcess(process, 0)
-                        kernel.CloseHandle(process)
-                else:
-                    kernel.FreeConsole()
-            except (AttributeError, OSError):
-                pass
+        kernel = ctypes.windll.kernel32
+        kernel.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+        kernel.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+        kernel.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]
+        kernel.Process32FirstW.restype = wintypes.BOOL
+        kernel.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]
+        kernel.Process32NextW.restype = wintypes.BOOL
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel.CloseHandle.restype = wintypes.BOOL
+        processes = {}      # pid -> (parent pid, exe name)
+        snapshot = kernel.CreateToolhelp32Snapshot(0x00000002, 0)
+        if snapshot == ctypes.c_void_p(-1).value:
+            return None
+        entry = PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(entry)
+        ok = kernel.Process32FirstW(snapshot, ctypes.byref(entry))
+        while ok:
+            processes[entry.th32ProcessID] = (entry.th32ParentProcessID,
+                                              entry.szExeFile.lower())
+            ok = kernel.Process32NextW(snapshot, ctypes.byref(entry))
+        kernel.CloseHandle(snapshot)
+
+        pid = os.getppid()
+        for _ in range(5):      # a few launchers at most (and no PID-reuse loops)
+            parent, name = processes.get(pid, (None, ""))
+            if name == "cmd.exe":
+                return pid
+            if name not in cls.PYTHON_LAUNCHERS or parent is None:
+                return None
+            pid = parent
+        return None
+
+    @classmethod
+    def _close_command_window(cls):
+        """Close the cmd.exe window that started the editor; detach otherwise."""
+        if os.name != "nt":
+            return
+        try:
+            import ctypes
+            from ctypes import wintypes
+            kernel = ctypes.windll.kernel32
+            kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel.OpenProcess.restype = wintypes.HANDLE
+            kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+            kernel.TerminateProcess.restype = wintypes.BOOL
+            kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel.CloseHandle.restype = wintypes.BOOL
+            shell = cls._command_shell_pid()
+            if shell:
+                process = kernel.OpenProcess(0x0001, False, shell)   # PROCESS_TERMINATE
+                if process:
+                    kernel.TerminateProcess(process, 0)
+                    kernel.CloseHandle(process)
+            else:
+                kernel.FreeConsole()
+        except (AttributeError, OSError):
+            pass
 
     def end_editor(self):
         """ISPF END: finish editing, offering to save pending changes."""
@@ -392,13 +535,13 @@ class ISPFEditor:
                 return
             self._dirty = True
         if self.mode == "EDIT" and self._dirty:
-            answer = messagebox.askyesnocancel("End", "Save changes before exiting?")
+            answer = messagebox.askyesnocancel(
+                "End", f"Save changes to {Path(self.filename or '(new)').name} before exiting?")
             if answer is None:
                 return
             if answer and not self.save_file():
                 return
-        self._close_command_window()
-        self.root.destroy()
+        self._close()
 
     # ------------------------------------------------------------------
     # Line state: labels and excluded lines
@@ -690,6 +833,135 @@ class ISPFEditor:
         except tk.TclError:
             return False
 
+    def _compare_tags(self):
+        """{line_number: COMPARE tag} for the rows COMPARE marked."""
+        tags = {}
+        for tag in ("compare_added", "compare_removed"):
+            ranges = self.text.tag_ranges(tag)
+            for start, end in zip(ranges[::2], ranges[1::2]):
+                first, last = int(str(start).split(".")[0]), int(str(end).split(".")[0])
+                # A range ends at the start of the line after its last row
+                for line in range(first, last if str(end).endswith(".0") else last + 1):
+                    tags[line] = tag
+        return tags
+
+    def _set_compare_tags(self, tags):
+        for tag in ("compare_added", "compare_removed"):
+            self.text.tag_remove(tag, "1.0", tk.END)
+        for line, tag in tags.items():
+            self.text.tag_add(tag, f"{line}.0", f"{line}.end +1c")
+
+    @staticmethod
+    def _hex_rows(line):
+        """The two hex rows shown under a line: high and low nibbles of its bytes."""
+        raw = line.encode("utf-8")
+        return [HEX_PREFIX + "".join(f"{byte >> 4:X}" for byte in raw),
+                HEX_PREFIX + "".join(f"{byte & 0x0F:X}" for byte in raw)]
+
+    def _rebuild_rows(self, rows_for):
+        """Rebuild the buffer row by row as one undo step, for display rows.
+
+        rows_for(line_number, text) -> (keep the row?, display rows to add after
+        it). Labels, excluded lines, inserted lines, COMPARE marks, pending line
+        commands and the screen follow their rows; rows added after an excluded
+        line are excluded too. The data does not change, so neither does the
+        modified flag. Returns old -> new line number mapping, or None if nothing
+        changed.
+        """
+        old_lines = self.text.get("1.0", "end-1c").split("\n")
+        labels, excluded = self._get_line_state()
+        temp, compare = self.get_temp_lines(), self._compare_tags()
+        pending = self._get_pending_commands()
+        found = self.text.tag_ranges("found")
+        found = [(str(a), str(b)) for a, b in zip(found[::2], found[1::2])]
+        new_lines, remap, new_excluded = [], {}, set()
+        for i, line in enumerate(old_lines, 1):
+            keep, extra = rows_for(i, line)
+            if keep:
+                new_lines.append(line)
+                remap[i] = len(new_lines)
+                if i in excluded:
+                    new_excluded.add(len(new_lines))
+            for row in extra:
+                new_lines.append(row)
+                if i in excluded:
+                    new_excluded.add(len(new_lines))
+        if new_lines == old_lines:
+            # Same rows, but they may need their line's exclusion (X on a line
+            # with hex rows under it)
+            if new_excluded != excluded:
+                self.set_excluded(new_excluded)
+                self.refresh_gutter(keep=pending)
+                self._place_markers()
+            return None
+        kept = sorted(remap)
+
+        def moved(line):
+            """New number of a line (if dropped, of the next kept one)."""
+            if line in remap:
+                return remap[line]
+            later = next((k for k in kept if k > line), kept[-1] if kept else None)
+            return remap[later] if later else 1
+
+        (top, _), (insert_line, insert_col) = (
+            (int(v) for v in index.split(".")) for index in self._get_view())
+        gutter_line = self._current_line(self.line_numbers)
+        dirty, processing = self._dirty, self._processing
+        self._processing = True
+        try:
+            self._commit_text("\n".join(new_lines), (
+                {name: remap[v] for name, v in labels.items() if v in remap}, new_excluded))
+            self.text.edit_modified(False)
+        finally:
+            self._processing = processing
+        self._dirty = dirty
+        self.set_temp_lines(remap[t] for t in temp if t in remap)
+        self._set_compare_tags({remap[k]: tag for k, tag in compare.items() if k in remap})
+        for start, end in found:
+            (l1, c1), (l2, c2) = (s.split(".") for s in (start, end))
+            if int(l1) in remap and l1 == l2:
+                self.text.tag_add("found", f"{remap[int(l1)]}.{c1}", f"{remap[int(l1)]}.{c2}")
+        self.refresh_gutter(keep={remap[k]: c for k, c in pending.items() if k in remap})
+        self.line_numbers.mark_set(tk.INSERT, f"{moved(gutter_line)}.0")
+        self._set_view((f"{moved(top)}.0", f"{moved(insert_line)}.{insert_col}"))
+        return moved
+
+    def _sync_hex_rows(self):
+        """HEX ON: two hex rows under every data line, rebuilt from the data
+        (on each Enter). Returns the line mapping, or None if nothing moved."""
+        if not self.hex_mode:
+            return None
+        temp = self.get_temp_lines()
+        entry = (range(self._text_entry[0], sum(self._text_entry))
+                 if self._text_entry else range(0))
+
+        def rows_for(i, line):
+            if line.startswith(HEX_PREFIX):
+                return False, []
+            if (line.startswith(INFO_PREFIXES) or self._is_compare_line(i)
+                    or i in temp or i in entry):
+                return True, []
+            return True, self._hex_rows(line)
+        return self._rebuild_rows(rows_for)
+
+    def set_hex(self, args=()):
+        """HEX [ON|OFF] [VERT]: hex rows under every line (HEX alone = ON)."""
+        values = {a.upper() for a in args} or {"ON"}
+        if values - {"ON", "OFF", "VERT", "DATA"} or {"ON", "OFF"} <= values:
+            self.status.config(text="HEX: use HEX ON, HEX OFF or HEX VERT")
+            return
+        if "DATA" in values:
+            self.status.config(text="HEX DATA is not supported - use HEX ON (vertical)")
+            return
+        if "OFF" in values:
+            self.hex_mode = False
+            self._rebuild_rows(lambda _i, line: (not line.startswith(HEX_PREFIX), []))
+            self.status.config(text="HEX OFF")
+        else:
+            self.hex_mode = True
+            self._sync_hex_rows()
+            self.status.config(text="HEX ON - hex rows under each line (vertical)")
+
     def refresh_gutter(self, event=None, keep=None):
         """Redraw the gutter (numbers, labels, excluded blocks) and hide excluded lines.
 
@@ -710,12 +982,13 @@ class ISPFEditor:
         self.text.tag_remove("hexprefix", "1.0", tk.END)
         self.text.tag_remove("hexinfo", "1.0", tk.END)
         for i in range(1, line_count + 1):
-            if content_lines[i - 1].startswith("=HEX> "):
-                # The marker is hidden so the hexadecimal digits begin at the
-                # same screen column as the source line above them.
-                self.text.tag_add("hexprefix", f"{i}.0", f"{i}.6")
+            if content_lines[i - 1].startswith(INFO_PREFIXES):
+                # The marker is hidden so the hexadecimal digits (or the ruler)
+                # begin at the same screen column as the data lines.
+                self.text.tag_add("hexprefix", f"{i}.0", f"{i}.{FIELD_WIDTH}")
                 self.text.tag_add("hexinfo", f"{i}.0", f"{i}.end")
-                fields.append(" " * FIELD_WIDTH)
+                fields.append(COLS_PREFIX if content_lines[i - 1].startswith(COLS_PREFIX)
+                              else " " * FIELD_WIDTH)
             elif "compare_removed" in self.text.tag_names(f"{i}.0"):
                 fields.append(" " * FIELD_WIDTH)
             elif i in run_starts:
@@ -1087,6 +1360,18 @@ class ISPFEditor:
                 self._error_lines = {int(n) for n in re.findall(r"line (\d+):", message)} or set(commands)
             elif not keep:
                 self._error_lines.clear()
+            if not keep:
+                # HEX ON: hex rows follow the data; cursor targets move with their rows
+                moved = self._sync_hex_rows()
+                if moved:
+                    if self._insert_focus:
+                        self._insert_focus = moved(self._insert_focus)
+                    if self._text_entry:
+                        self._text_entry = (moved(self._text_entry[0]), self._text_entry[1])
+                    if dropped_line:
+                        dropped_line = moved(dropped_line)
+                    if self._cursor_line:
+                        self._cursor_line = (moved(self._cursor_line[0]), self._cursor_line[1])
             # Rebuilding the gutter (hidden lines, tail space) must not move the screen
             top = self.text.index("@0,0 linestart")
             self.refresh_gutter(keep=keep)
@@ -1137,7 +1422,10 @@ class ISPFEditor:
                 else:
                     label_cmds.append((ln - 1, raw[1:]))
                 continue
-            if raw in ("COLS", "BOUNDS"):
+            if raw == "COLS":
+                parsed.append((ln - 1, "COLS", 0))
+                continue
+            if raw == "BOUNDS":
                 info.append(f"{raw} not supported (simplified)")
                 continue
             m = LINE_CMD_RE.match(raw)
@@ -1172,10 +1460,10 @@ class ISPFEditor:
                     ops.append((BLOCK_CMDS[op], start, block_end.get(idx, idx), shift))
                 else:
                     open_blocks[op] = (idx, cnt)
-            elif op in ("D", "C", "M", "UC", "LC", "X", "HX"):
+            elif op in ("D", "C", "M", "UC", "LC", "X", "HX", "MD"):
                 # Like SPFLite, a count must not run past the last line
                 # (except for X, which excludes to the bottom)
-                if op in ("D", "C", "M", "UC", "LC") and idx + cnt > n:
+                if op in ("D", "C", "M", "UC", "LC", "MD") and idx + cnt > n:
                     return (f"Repeat value extends past the last line - "
                             f"line {idx + 1}"), commands
                 end = min(idx + max(cnt, 1) - 1, n - 1)
@@ -1220,6 +1508,7 @@ class ISPFEditor:
                   if i <= n and not lines[i - 1] and i not in commands}
         before, after = defaultdict(list), defaultdict(list)
         msgs = []
+        compare_tags = self._compare_tags()
         for op, s, e, cnt in ops:
             rng = range(s, e + 1)
             if op == "D":
@@ -1249,11 +1538,26 @@ class ISPFEditor:
                 for k in rng:
                     # ISPF HX is a display command: retain the source line and
                     # put the high and low hex nibbles on two rows beneath it.
-                    raw = lines[k].encode("utf-8")
-                    high = "".join(f"{byte >> 4:X}" for byte in raw)
-                    low = "".join(f"{byte & 0x0F:X}" for byte in raw)
-                    after[k].extend((f"=HEX> {high}", f"=HEX> {low}"))
+                    after[k].extend(self._hex_rows(lines[k]))
                 msgs.append(f"Displayed two hex info lines under {len(rng)} line(s)")
+            elif op == "MD":
+                # Make data: special rows (COLS, hex, COMPARE's removed lines)
+                # become ordinary lines; data lines stay as they are
+                made = 0
+                for k in rng:
+                    if compare_tags.get(k + 1) == "compare_removed":
+                        del compare_tags[k + 1]
+                        made += 1
+                    elif lines[k].startswith(INFO_PREFIXES):
+                        lines[k] = lines[k][FIELD_WIDTH:]
+                        made += 1
+                msgs.append(f"{made} line(s) made data")
+            elif op == "COLS":
+                # Like ISPF, a column ruler row after the line (after the
+                # whole block when entered on an excluded block)
+                width = max([self._visible_columns()] + [len(line) for line in lines])
+                after[e].append(COLS_PREFIX + cols_ruler(width))
+                msgs.append("Column ruler displayed")
             elif op == "TS":
                 line = lines[s]
                 cursor = self.text.index(tk.INSERT)
@@ -1265,12 +1569,12 @@ class ISPFEditor:
                 msgs.append(f"Split line {s + 1}; inserted {max(cnt, 1)} blank line(s)")
             elif op == "TF":
                 start_line = lines[s]
-                if start_line.strip() and not start_line.startswith("=HEX> "):
+                if start_line.strip() and not start_line.startswith(INFO_PREFIXES):
                     indent = len(start_line) - len(start_line.lstrip())
                     paragraph = [s]
                     for k in range(s + 1, n):
                         candidate = lines[k]
-                        if (not candidate.strip() or candidate.startswith("=HEX> ")
+                        if (not candidate.strip() or candidate.startswith(INFO_PREFIXES)
                                 or len(candidate) - len(candidate.lstrip()) != indent):
                             break
                         paragraph.append(k)
@@ -1303,7 +1607,7 @@ class ISPFEditor:
         if sources:
             op, s, e, _ = sources[0]
             self.line_clipboard = [line for i, line in enumerate(lines[s:e + 1], s + 1)
-                                   if not line.startswith("=HEX> ")
+                                   if not line.startswith(INFO_PREFIXES)
                                    and not self._is_compare_line(i)]
             self.clipboard_line = "\n".join(self.line_clipboard) + "\n"
             if op == "M":
@@ -1330,7 +1634,7 @@ class ISPFEditor:
                     return "Cannot move lines over themselves with O/OO", commands
             source_lines = self.line_clipboard
             target_indexes = [i for i in range(dest_start, dest_end + 1)
-                              if not lines[i].startswith("=HEX> ")
+                              if not lines[i].startswith(INFO_PREFIXES)
                               and not self._is_compare_line(i + 1)]
             if not source_lines or not target_indexes:
                 return "O/OO needs standard source and destination lines", commands
@@ -1383,6 +1687,8 @@ class ISPFEditor:
         kept = [remap[v] for v in range(cursor, n) if v in remap]
         self._cursor_line = (kept[0] + 1 if kept else len(new_lines), cursor in remap)
         self._commit_text("\n".join(new_lines), (new_labels, new_excluded))
+        self._set_compare_tags({remap[i - 1] + 1: tag for i, tag in compare_tags.items()
+                                if i - 1 in remap})
         self.set_temp_lines(new_temp)
         self._insert_focus = new_temp[0] if new_temp else None
         text_entry_ops = [o for o in ops if o[0] == "TE"]
@@ -1449,6 +1755,15 @@ class ISPFEditor:
 
         if command == "SAVE":
             self.save_file()
+        elif command in ("EDIT", "VIEW", "BROWSE"):
+            # Like ISPF's EDIT/VIEW/BROWSE: another file (with tabs, in its own tab)
+            path = cmd[len(parts[0]):].strip().strip("'\"")
+            self.edit_file(command, path or None)
+        elif command == "SWAP":
+            if self.app:
+                self.app.swap(args[0].upper() if args else "NEXT")
+            else:
+                self.status.config(text="SWAP: only one file is open")
         elif command in ("CAN", "CANCEL"):
             self.cancel_editor()
         elif command in ("END", "EXIT"):
@@ -1468,8 +1783,9 @@ class ISPFEditor:
             operands = cmd[len(parts[0]):].strip()
             strings, options, columns = self._parse_search_operands(operands)
             if len(strings) >= 2:
-                (old, exact), (new, _) = strings[0], strings[1]
-                self.change_text(old, new, exact=exact, options=options, columns=columns)
+                (old, exact), (new, new_kind) = strings[0], strings[1]
+                self.change_text(old, new, exact=exact, options=options, columns=columns,
+                                 new_picture=new_kind == "P")
             else:
                 old = simpledialog.askstring("Change", "Find:")
                 new = simpledialog.askstring("Change", "Replace with:")
@@ -1527,7 +1843,7 @@ class ISPFEditor:
         elif command in ("UC", "LC"):
             self.change_case("upper" if command == "UC" else "lower", args)
         elif command == "HEX":
-            self.toggle_hex()
+            self.set_hex(args)
         elif command == "HELP":
             self.show_help()
         elif command == "UNDO":
@@ -1553,6 +1869,12 @@ class ISPFEditor:
             self.show_help()
         else:
             self.status.config(text=f"Unknown command: {command}")
+        # HEX ON: the hex rows follow changed data (UNDO/REDO restore their own)
+        if command not in ("HEX", "UNDO", "REDO"):
+            try:
+                self._sync_hex_rows()
+            except tk.TclError:
+                pass    # END/CANCEL closed the editor
 
     def _locate_category_lines(self, category):
         """Return line numbers matching a LOCATE category."""
@@ -1569,11 +1891,11 @@ class ISPFEditor:
         lines = self.text.get("1.0", "end-1c").split("\n")
         if category == "SPECIAL":
             return [i for i, line in enumerate(lines, 1)
-                    if line.startswith("=HEX> ") or self._is_compare_row(i)]
+                    if line.startswith(INFO_PREFIXES) or self._is_compare_row(i)]
         if category == "CHANGE":
             baseline = getattr(self, "_baseline_lines", [""])
             positions = [i for i, line in enumerate(lines, 1)
-                         if not line.startswith("=HEX> ") and not self._is_compare_line(i)]
+                         if not line.startswith(INFO_PREFIXES) and not self._is_compare_line(i)]
             comparable = [lines[i - 1] for i in positions]
             changed = set()
             for tag, _i1, _i2, j1, j2 in SequenceMatcher(None, baseline, comparable).get_opcodes():
@@ -1599,7 +1921,7 @@ class ISPFEditor:
                 if not self._is_compare_line(i)]
         # Compare source records only; HX and existing compare rows are display data.
         source = [(old_line, line) for old_line, line in keep
-                  if not line.startswith("=HEX> ")]
+                  if not line.startswith(INFO_PREFIXES)]
         before = list(baseline_lines)
         after = [line for _, line in source]
         if before == [""]:
@@ -1625,7 +1947,7 @@ class ISPFEditor:
         output, output_kinds, old_to_new = [], [], {}
         source_index = 0
         for old_line, line in keep:
-            if line.startswith("=HEX> "):
+            if line.startswith(INFO_PREFIXES):
                 old_to_new[old_line] = len(output) + 1
                 output.append(line)
                 output_kinds.append("hex")
@@ -1809,7 +2131,7 @@ class ISPFEditor:
             first, last = sorted(resolved)
         excluded = self.get_excluded()
         positions = [index for index in range(first - 1, min(last, len(lines)))
-                     if not lines[index].startswith("=HEX> ")
+                     if not lines[index].startswith(INFO_PREFIXES)
                      and not self._is_compare_line(index + 1)
                      and (excluded_mode != "X" or index + 1 in excluded)
                      and (excluded_mode != "NX" or index + 1 not in excluded)]
@@ -2004,15 +2326,9 @@ class ISPFEditor:
             self.status.config(text="EXCLUDE: missing search string")
             return
         lines = self.text.get("1.0", "end-1c").split("\n")
-        if not exact:
-            needle = search_term.casefold()
-        else:
-            needle = search_term
-        matches = []
-        for line_no, line in enumerate(lines, 1):
-            haystack = line if exact else line.casefold()
-            if needle in haystack:
-                matches.append(line_no)
+        pattern = self._search_pattern(search_term, exact)
+        matches = [line_no for line_no, line in enumerate(lines, 1)
+                   if not line.startswith(INFO_PREFIXES) and pattern.search(line)]
         if not matches:
             self.status.config(text=f"EXCLUDE: '{search_term}' not found")
             return
@@ -2039,28 +2355,11 @@ class ISPFEditor:
         everything = not keys or "ALL" in keys
         view = self._get_view()
         done = []
-        # HX rows are transient display information. RES clears them along
-        # with the other editor-only state, while preserving labels/exclusions.
-        old_lines = self.text.get("1.0", "end-1c").split("\n")
-        retained = [i for i, line in enumerate(old_lines)
-                    if not line.startswith("=HEX> ") and not self._is_compare_line(i + 1)]
-        if len(retained) != len(old_lines):
-            remap = {old: new for new, old in enumerate(retained)}
-            labels, excluded = self._get_line_state()
-            new_labels = {name: remap[line - 1] + 1 for name, line in labels.items()
-                          if line - 1 in remap}
-            new_excluded = {remap[line - 1] + 1 for line in excluded
-                            if line - 1 in remap}
-            old_top = int(view[0].split(".")[0]) - 1
-            old_insert = int(view[1].split(".")[0]) - 1
-            def mapped_line(old):
-                if old in remap:
-                    return remap[old] + 1
-                later = next((i for i in retained if i >= old), retained[-1] if retained else 0)
-                return remap[later] + 1
-            self._commit_text("\n".join(old_lines[i] for i in retained),
-                              (new_labels, new_excluded))
-            view = (f"{mapped_line(old_top)}.0", f"{mapped_line(old_insert)}.0")
+        # HX/COLS rows and COMPARE's removed lines are display information:
+        # RES clears them, keeping labels and excluded lines on their lines
+        if self._rebuild_rows(lambda i, line: (not line.startswith(INFO_PREFIXES)
+                                               and not self._is_compare_line(i), [])):
+            view = self._get_view()
             done.append("hex info lines")
         self.text.tag_remove("compare_added", "1.0", tk.END)
         self.text.tag_remove("compare_removed", "1.0", tk.END)
@@ -2138,7 +2437,7 @@ class ISPFEditor:
             return
         for path in self._recent_files:
             menu.add_command(label=path, command=lambda selected=path:
-                             self.open_file("EDIT", selected))
+                             self.edit_file("EDIT", selected))
         menu.add_separator()
         menu.add_command(label="Clear Recent Files", command=self._clear_recent_files)
 
@@ -2168,7 +2467,8 @@ class ISPFEditor:
 
     def _add_recent_file(self, path):
         resolved = str(Path(path).expanduser().resolve())
-        self._recent_files = [item for item in self._recent_files if item != resolved]
+        # Other tabs may have added files since this editor loaded the list
+        self._recent_files = [item for item in self._load_recent_files() if item != resolved]
         self._recent_files.insert(0, resolved)
         del self._recent_files[10:]
         self._save_recent_files()
@@ -2244,8 +2544,12 @@ class ISPFEditor:
             self.filename = fname
             self._add_recent_file(fname)
             self.mode = mode
+            self._update_title()
             self.text.config(state=tk.NORMAL if mode == "EDIT" else tk.DISABLED)
             self.refresh_gutter()
+            if self._sync_hex_rows():
+                self.text.edit_reset()  # the hex rows are not an undoable change
+                self.text.mark_set(tk.INSERT, "1.0")
             self.text.yview_moveto(0)
             self.cmd_entry.focus_set()
             self.update_status()
@@ -2261,7 +2565,7 @@ class ISPFEditor:
             # HX rows are editor display information, not file contents.
             content = "\n".join(
                 line for i, line in enumerate(self.text.get("1.0", "end-1c").split("\n"), 1)
-                if not line.startswith("=HEX> ") and not self._is_compare_line(i)
+                if not line.startswith(INFO_PREFIXES) and not self._is_compare_line(i)
             )
             # Like SPFLite, trailing blanks are not written to the file
             trimmed = "\n".join(line.rstrip(" ") for line in content.split("\n"))
@@ -2271,6 +2575,7 @@ class ISPFEditor:
             self._baseline_lines = content.split("\n")
             self._dirty = False
             self.text.edit_modified(False)
+            self._update_title()   # Save As: a new path
             self.status.config(text=f"Saved: {self.filename}")
             return True
         except Exception as e:
@@ -2289,7 +2594,7 @@ class ISPFEditor:
         """Current data records, omitting editor-only display rows."""
         return [line for i, line in enumerate(
                     self.text.get("1.0", "end-1c").split("\n"), 1)
-                if not line.startswith("=HEX> ") and not self._is_compare_line(i)]
+                if not line.startswith(INFO_PREFIXES) and not self._is_compare_line(i)]
 
     def _insert_external_records(self, records, before_index):
         """Insert records and remap labels/exclusions as one undoable change."""
@@ -2408,10 +2713,10 @@ class ISPFEditor:
             records = list(self.line_clipboard)
             record_lines = None
         if record_lines is None:
-            records = [line for line in records if not line.startswith("=HEX> ")]
+            records = [line for line in records if not line.startswith(INFO_PREFIXES)]
         else:
             records = [line for line, line_no in zip(records, record_lines)
-                       if not line.startswith("=HEX> ") and not self._is_compare_line(line_no)]
+                       if not line.startswith(INFO_PREFIXES) and not self._is_compare_line(line_no)]
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
             if command == "CREATE":
@@ -2455,8 +2760,23 @@ class ISPFEditor:
             return left_word and not right_word
         return True
 
+    # Picture string (P'...') characters, as in ISPF; any other character
+    # matches itself in either case
+    PICTURE_CLASSES = {
+        "=": ".",                           # any character
+        "@": r"[^\W\d_]",                   # alphabetic
+        "#": "[0-9]",                       # numeric
+        "-": "[^0-9]",                      # non-numeric
+        "$": r"(?:[^\w\s]|_)",              # special: not blank, letter or digit
+        "¬": "[^ ]", "^": "[^ ]",           # non-blank (^ for ASCII keyboards)
+        ".": r"[\x00-\x1f\x7f-\x9f]",       # non-displayable
+        "<": "[a-z\xdf-\xf6\xf8-\xff]",     # lowercase alphabetic
+        ">": "[A-Z\xc0-\xd6\xd8-\xde]",     # uppercase alphabetic
+    }
+
     @staticmethod
     def _decode_search_string(value, quoted=False):
+        """(text, kind): kind False = any case, True = exact, "P" = picture string."""
         m = re.fullmatch(r"([CXPT])(['\"])(.*)\2", value, re.IGNORECASE)
         if not m:
             return value, quoted
@@ -2466,7 +2786,23 @@ class ISPFEditor:
                 return bytes.fromhex(body).decode("latin1"), True
             except ValueError:
                 return "", True
+        if kind.upper() == "P":
+            return body, "P"
         return body, True
+
+    @classmethod
+    def _search_pattern(cls, text, kind):
+        """Compiled regex for a search string of the given kind (see above)."""
+        if kind == "P":
+            return re.compile("".join(cls.PICTURE_CLASSES.get(c) or f"(?i:{re.escape(c)})"
+                                      for c in text))
+        return re.compile(re.escape(text), 0 if kind else re.IGNORECASE)
+
+    @staticmethod
+    def _picture_replace(found, picture):
+        """Apply a CHANGE picture to-string: = keeps, < lowers, > uppers a character."""
+        return "".join(o if p == "=" else o.lower() if p == "<" else o.upper() if p == ">"
+                       else p for o, p in zip(found, picture))
 
     def _parse_search_operands(self, raw):
         strings, options, nums = [], [], []
@@ -2508,10 +2844,11 @@ class ISPFEditor:
         direction = next((o for o in options if o in self.FIND_DIRECTIONS), "NEXT")
         mode = next((o for o in options if o in self.MATCH_MODES), "CHARS")
         search_term = " ".join(v for v, _ in operands)
-        exact = any(q for _, q in operands)
+        kind = "P" if any(q == "P" for _, q in operands) else any(q for _, q in operands)
         if not search_term:
             self.status.config(text="FIND: no search string")
             return
+        pattern = self._search_pattern(search_term, kind)
 
         range_start, range_end = "1.0", "end-1c"
         if labels:
@@ -2542,15 +2879,12 @@ class ISPFEditor:
         for ln in range(first_line, last_line + 1):
             if ("X" in options and ln not in excluded) or ("NX" in options and ln in excluded): continue
             line = self.text.get(f"{ln}.0", f"{ln}.end")
+            if line.startswith(INFO_PREFIXES): continue  # HX/COLS rows are not data
             left, right = col_start - 1, min(len(line), col_end) if col_end else len(line)
             segment = line[left:right]
-            hay, needle = (segment, search_term) if exact else (segment.casefold(), search_term.casefold())
-            offsets = []
-            pos = 0
-            while needle and (pos := hay.find(needle, pos)) >= 0:
-                if self._match_fits(hay, pos, pos + len(needle), mode): offsets.append(pos)
-                pos += max(1, len(needle))
-            candidates.extend((ln, left + off, len(search_term)) for off in offsets)
+            for match in pattern.finditer(segment):
+                if self._match_fits(segment, *match.span(), mode):
+                    candidates.append((ln, left + match.start(), match.end() - match.start()))
         candidates.sort()
         if "ALL" in options and not repeat:
             self._reveal_found_lines(candidates)
@@ -2563,10 +2897,6 @@ class ISPFEditor:
                 self.text.see(first)
             self.status.config(text=f"FIND: {len(candidates)} occurrence(s) of '{search_term}'")
             return
-        def search(index, stop, backwards=False):
-            return self.text.search(search_term, index, stopindex=stop,
-                                    backwards=backwards, nocase=not exact, elide=True)
-
         # Cursor clamped into the range; NEXT skips the current hit
         cursor = self.text.index(tk.INSERT)
         if self.text.compare(cursor, "<", range_start):
@@ -2590,7 +2920,7 @@ class ISPFEditor:
             if line in excluded:
                 self.set_excluded(excluded - {line})
                 self.refresh_gutter(keep=self._get_pending_commands())
-            end = f"{start}+{len(search_term)}c"
+            end = f"{start}+{chosen[2]}c"
             self.text.tag_remove("found", "1.0", tk.END)
             self.text.tag_add("found", start, end)
             # Like ISPF, the cursor goes to the found string
@@ -2623,8 +2953,12 @@ class ISPFEditor:
             result.append((typed, False) if typed else ((single or double), True) if not word else (word, False))
         return result
 
-    def change_text(self, old=None, new=None, exact=False, options=(), columns=None):
-        """Change one selected occurrence, or every match with the ALL operand."""
+    def change_text(self, old=None, new=None, exact=False, options=(), columns=None,
+                    new_picture=False):
+        """Change one selected occurrence, or every match with the ALL operand.
+
+        exact: as kind in _decode_search_string ("P" = picture string).
+        new_picture: new is a picture (= keep, < lower, > upper a character)."""
         if not old:
             old = simpledialog.askstring("Change", "Find:")
         if new is None:
@@ -2655,12 +2989,14 @@ class ISPFEditor:
         if hidden and shown:
             self.status.config(text="CHANGE: choose X or NX, not both")
             return
+        if new_picture and len(new) != len(old):
+            self.status.config(text="CHANGE: a picture to-string must be as long as the from-string")
+            return
         candidates = []
-        flags = 0 if exact else re.IGNORECASE
-        matcher = re.compile(re.escape(old), flags)
+        matcher = self._search_pattern(old, exact)
         for line_no in range(first, last + 1):
             if ((hidden and line_no not in excluded) or (shown and line_no in excluded)
-                    or lines[line_no - 1].startswith("=HEX> ")
+                    or lines[line_no - 1].startswith(INFO_PREFIXES)
                     or self._is_compare_line(line_no)):
                 continue
             i = line_no - 1
@@ -2675,7 +3011,7 @@ class ISPFEditor:
 
         candidates.sort()
         if not candidates:
-            self._last_change = (old, new, exact, options, columns)
+            self._last_change = (old, new, exact, options, columns, new_picture)
             self.status.config(text=f"CHANGE: '{old}' not found")
             return
         if "ALL" in options:
@@ -2698,7 +3034,9 @@ class ISPFEditor:
         old_state = self._get_line_state()
         for line_no, col, size in reversed(chosen):
             line = lines[line_no - 1]
-            lines[line_no - 1] = line[:col] + new + line[col + size:]
+            found = line[col:col + size]
+            text = self._picture_replace(found, new) if new_picture else new
+            lines[line_no - 1] = line[:col] + text + line[col + size:]
         new_content = "\n".join(lines)
         if new_content != content:
             self._commit_text(new_content, old_state)
@@ -2719,7 +3057,7 @@ class ISPFEditor:
         self.text.focus_set()
         self.text.mark_set(tk.INSERT, f"{line_no}.{final_col}")
         self.text.see(tk.INSERT)
-        self._last_change = (old, new, exact, options, columns)
+        self._last_change = (old, new, exact, options, columns, new_picture)
         scope = "ALL" if "ALL" in options else direction
         self.status.config(text=f"Changed {len(chosen)} occurrence(s) of '{old}' ({scope})")
 
@@ -2728,11 +3066,12 @@ class ISPFEditor:
         if not self._last_change:
             self.status.config(text="RCHANGE: no previous CHANGE command")
             return
-        old, new, exact, options, columns = self._last_change
+        old, new, exact, options, columns, new_picture = self._last_change
         retained = [o for o in options
                     if o not in (*self.FIND_DIRECTIONS, "ALL")]
         self.change_text(old, new, exact=exact,
-                         options=tuple(retained) + ("NEXT",), columns=columns)
+                         options=tuple(retained) + ("NEXT",), columns=columns,
+                         new_picture=new_picture)
 
     # ------------------------------------------------------------------
     # Case Conversion
@@ -2763,7 +3102,7 @@ class ISPFEditor:
         altered = 0
         for i in range(first - 1, last):
             # HX rows and COMPARE rows are display information, not data
-            if lines[i].startswith("=HEX> ") or self._is_compare_line(i + 1):
+            if lines[i].startswith(INFO_PREFIXES) or self._is_compare_line(i + 1):
                 continue
             new = lines[i].upper() if case == "upper" else lines[i].lower()
             altered += new != lines[i]
@@ -2796,15 +3135,6 @@ class ISPFEditor:
     # ------------------------------------------------------------------
     # Display Options
     # ------------------------------------------------------------------
-    def toggle_hex(self):
-        """Toggle hex display mode (simplified)."""
-        self.hex_mode = not self.hex_mode
-        if self.hex_mode:
-            self.status.config(text="HEX ON - showing character codes (simplified)")
-        else:
-            self.status.config(text="HEX OFF")
-        self.update_status()
-
     def _text_key_release(self, event):
         """Show the cursor position while typing, but keep the message of an
         Enter key (it may have been pressed on the command line, e.g. FIND ALL)."""
@@ -2832,7 +3162,9 @@ class ISPFEditor:
 
 PRIMARY COMMANDS (enter at Command ===>):
   SAVE       - Save the current file
-  CANCEL/CAN - Discard changes and exit
+  END/EXIT   - Close the file (asks to save changes); the last tab closes
+               the window and the cmd.exe window that started the editor
+  CANCEL/CAN - Discard changes and close the file
   FIND/F x [NEXT|PREV|FIRST|LAST|ALL] [CHARS|WORD|PREFIX|SUFFIX]
              [X|NX] [col1 col2] [.a .b]
              - Search by direction or count every hit with ALL. X/NX
@@ -2842,6 +3174,8 @@ PRIMARY COMMANDS (enter at Command ===>):
              [X|NX] [col1 col2] [.a .b]
              - Changes one occurrence (NEXT by default); ALL changes every match.
                PF6/RCHANGE changes the next occurrence using the last CHANGE options.
+  RFIND/RF   - Repeat the last FIND (PF5)
+  RETRIEVE   - Bring back the previous command (PF12)
   Case: F x / C a b ignore upper/lower case.
         F 'x' / C 'a' b are case-sensitive. Quotes ('x' or "x")
         are also needed for spaces or keywords: F 'last one'
@@ -2883,7 +3217,13 @@ PRIMARY COMMANDS (enter at Command ===>):
                FIND LABEL ALL (LABEL/ALL also remove labels)
   UC/LC ALL | .a [.b] - Convert all lines, line .a or lines .a-.b to
                UPPER / lower case (a line range is required)
-  HEX        - Toggle hex display mode
+  HEX [ON|OFF] - Two hex rows under every line, updated on each Enter
+               (HEX alone = ON; MD on a hex row turns it into data)
+  EDIT/VIEW/BROWSE [file]
+             - Open another file in its own tab (no file: choose one)
+  SWAP [NEXT|PREV|n]
+             - Go to the next, previous or n-th tab (also Ctrl+Tab /
+               Ctrl+Shift+Tab); END/F3 closes the tab
   UNDO [ALL] - Undo one interaction, or all available undo history
   REDO       - Redo the last undone interaction
   CUT/PASTE  - Cut selected text / paste it
@@ -2916,6 +3256,9 @@ LINE COMMANDS (type DIRECTLY on the line number):
   >[n] / <[n] - Data shift right/left (default 2 spaces)
   >>..>> / <<..<< - Data shift a block
   HX[n]    - Show two aligned hex info lines under n lines (cleared by RES)
+  COLS     - Show a column ruler row after the line (D or RES removes it)
+  MD[n]    - Make data: COLS, hex and COMPARE rows become  MDD..MDD - block
+             ordinary lines of the file
   TS[n]    - Split at the text cursor, inserting n blank lines (default 1)
   TF[n]    - Flow this paragraph to column n (default 72)
   TE[n]    - Open a text-entry area; type, then press Enter to flow it
@@ -2936,12 +3279,25 @@ FIND WITH LABELS:
   FIND text LAST .a .b  - Last occurrence between the labels
   FIND text ALL         - Highlight and count all matching occurrences
   FIND/F 'a b'          - Quoted strings; C'..', X'..', P'..', T'..' forms
+  FIND P'##-@'          - Picture string: = any, @ alphabetic, # numeric,
+                          - non-numeric, $ special, ^ or ¬ non-blank,
+                          . non-displayable, < lower case, > upper case
+  CHANGE P'#' P'='      - In a picture to-string = keeps a character,
+                          < and > change its case (same length needed)
   FIND text WORD X 1 10 - Match whole words on hidden lines, columns 1-10
 
 MODES:
   EDIT   - Full editing (File > Open (Edit))
   BROWSE - Read-only viewing (File > Open (Browse))
   VIEW   - Read-only viewing (File > Open (View))
+
+FILES AND TABS:
+  python isfped.py [file ...] opens each file in its own tab.
+  The row above the command line shows the mode and the file's full
+  path: select it and press Ctrl+C, or press Copy path (also File >
+  Copy Full Path). A tab title ending in * has unsaved changes.
+  Opening a file that is already open goes to its tab; an empty new
+  tab is used for the next file opened.
 
 KEYBOARD:
   Home    - Jump to the command line
@@ -2960,6 +3316,7 @@ KEYBOARD:
           - 3270 Enter: always processes, the cursor stays put
   Ctrl+S  - Save
   Ctrl+F  - Find
+  Ctrl+Tab / Ctrl+Shift+Tab - Next / previous tab (SWAP NEXT / PREV)
 """
         existing = getattr(self, "_help_window", None)
         if existing is not None and existing.winfo_exists():
@@ -2998,9 +3355,123 @@ KEYBOARD:
 # ----------------------------------------------------------------------
 # Main Entry Point
 # ----------------------------------------------------------------------
+class EditorApp:
+    """The editor window: several files, one ISPFEditor per tab."""
+
+    def __init__(self, root):
+        self.root = root
+        self.root.title("ISPF Editor - Python/Tk")
+        self.root.geometry("900x600")
+        self.editors = []
+        menubar, self.file_menu, self.recent_files_menu, self.compare_selected_menu_index = (
+            build_menubar(root, lambda: self.current, self))
+        root.config(menu=menubar)
+        self.notebook = ttk.Notebook(root, takefocus=0)
+        self.notebook.pack(fill=tk.BOTH, expand=True)
+        self.notebook.bind("<<NotebookTabChanged>>", self._tab_changed)
+        root.bind("<FocusIn>", self._on_root_focus)
+        root.protocol("WM_DELETE_WINDOW", self.close_all)
+
+    @property
+    def current(self):
+        """The editor in the selected tab."""
+        selected = self.notebook.select()
+        return next((e for e in self.editors if str(e.frame) == selected), None)
+
+    def new_tab(self, path=None, mode="EDIT"):
+        frame = tk.Frame(self.notebook)
+        self.notebook.add(frame, text="(new)")
+        editor = ISPFEditor(self.root, parent=frame, app=self)
+        if not self.editors:
+            # Window-level keys (PF keys, Ctrl+S, ...) act on the current tab
+            for key in editor._root_keys():
+                self.root.bind(key, lambda e, key=key: self.current._root_keys()[key](e))
+        self.editors.append(editor)
+        self.notebook.select(frame)
+        if path:
+            editor.open_file(mode, path)
+        editor.cmd_entry.focus_set()
+        return editor
+
+    def open(self, path, mode="EDIT"):
+        """Open a file: go to its tab if it is open, use the current tab if
+        it is new and empty, otherwise open it in a new tab."""
+        target = os.path.abspath(path)
+        for editor in self.editors:
+            if editor.filename and os.path.abspath(editor.filename) == target:
+                self.notebook.select(editor.frame)
+                editor.status.config(text=f"Already open: {target}")
+                return editor
+        current = self.current
+        if current and current.is_empty():
+            current.open_file(mode, path)
+            return current
+        return self.new_tab(path, mode)
+
+    def update_tab(self, editor, name, path):
+        self.notebook.tab(editor.frame, text=name)
+        if editor is self.current:
+            self.root.title(f"{name} - ISPF Editor" if path else "ISPF Editor - Python/Tk")
+
+    def close_tab(self, editor):
+        """Close an editor's tab; False if it is the last one (keep the window)."""
+        if len(self.editors) <= 1:
+            return False
+        self.editors.remove(editor)
+        self.notebook.forget(editor.frame)
+        editor.frame.destroy()
+        return True
+
+    def close_all(self):
+        """Window close / Exit: END every tab (each may ask to save)."""
+        for editor in list(self.editors):
+            self.notebook.select(editor.frame)
+            editor.end_editor()
+            if editor in self.editors and len(self.editors) > 1:
+                return      # save cancelled: keep the window
+            try:
+                if not self.root.winfo_exists():
+                    return
+            except tk.TclError:
+                return      # the last END closed the window
+
+    def swap(self, where="NEXT"):
+        """SWAP NEXT|PREV|n: go to the next, previous or n-th tab."""
+        tabs = self.notebook.tabs()
+        index = tabs.index(self.notebook.select())
+        if where.isdigit() and 1 <= int(where) <= len(tabs):
+            index = int(where) - 1
+        elif where in ("NEXT", "PREV"):
+            index = (index + (1 if where == "NEXT" else -1)) % len(tabs)
+        else:
+            self.current.status.config(text=f"SWAP: use NEXT, PREV or 1-{len(tabs)}")
+            return
+        self.notebook.select(tabs[index])
+
+    def _tab_changed(self, event=None):
+        editor = self.current
+        if editor is None:
+            return
+        editor._update_title()
+        self.file_menu.entryconfigure(self.compare_selected_menu_index,
+                                      state=tk.NORMAL if editor.compare_filename else tk.DISABLED)
+        editor.cmd_entry.focus_set()
+        self.root.after_idle(editor._update_ispf_header)
+
+    def _on_root_focus(self, event):
+        if event.widget is self.root and self.current:
+            self.current.cmd_entry.focus_set()
+
+
 def main():
+    """python isfped.py [file ...]: each file in its own tab."""
     root = tk.Tk()
-    app = ISPFEditor(root)
+    app = EditorApp(root)
+    for path in sys.argv[1:] or [None]:
+        if path:
+            app.open(path)
+        else:
+            app.new_tab()
     root.mainloop()
 
 
