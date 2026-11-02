@@ -7,6 +7,7 @@ Line commands are entered DIRECTLY on the line number gutter.
 import re
 import json
 import os
+import bisect
 import sys
 import textwrap
 import tkinter as tk
@@ -91,6 +92,40 @@ def build_menubar(root, editor, app=None):
     help_menu.add_command(label="Help", command=lambda: editor().show_help())
     menubar.add_cascade(label="Help", menu=help_menu)
     return menubar, file_menu, recent_files_menu, compare_index
+
+
+# PL/I syntax colouring: one regex pass over the whole text, so multi-line comments work.
+SYNTAX_TAGS = {
+    "syn_comment": {"foreground": "#2e7d32"},
+    "syn_string": {"foreground": "#b5651d"},
+    "syn_sql": {"foreground": "#007c80"},
+    "syn_preproc": {"foreground": "#8000a0"},
+    "syn_number": {"foreground": "#a31515"},
+    "syn_keyword": {"foreground": "#0000c0"},
+}
+PLI_TOKEN_RE = re.compile(
+    r"(?P<syn_comment>/\*.*?(?:\*/|\Z))"
+    r"|(?P<syn_string>'(?:[^'\n]|'')*(?:'|$))"
+    r"|(?P<syn_sql>\bEXEC\s+SQL\b.*?(?:;|\Z))"
+    r"|(?P<syn_preproc>%\s*[A-Za-z_$#@][\w$#@]*)"
+    r"|(?P<syn_number>\b\d+(?:\.\d*)?(?:E[+-]?\d+)?\b)"
+    r"|(?P<syn_word>[A-Za-z_$#@][\w$#@]*)",
+    re.DOTALL | re.IGNORECASE | re.MULTILINE)
+PLI_KEYWORDS = frozenset("""
+    ALLOCATE ALLOC BEGIN BY CALL CHAR CHARACTER CLOSE DCL DECLARE DEFAULT DELETE DO ELSE END
+    ENTRY EXTERNAL EXT FETCH FIXED FLOAT FORMAT FREE GET GO GOTO IF INIT INITIAL INTERNAL
+    LEAVE LIKE LIST ITERATE NOT OPEN OPTIONS ON OTHERWISE PACKAGE PIC PICTURE POINTER PTR PROC
+    PROCEDURE PUT READ RECURSIVE REENTRANT RETURN RETURNS REVERT SELECT SIGNAL SKIP STATIC
+    STOP THEN TO UNTIL VARYING VAR WHEN WHILE WRITE BIN BINARY DEC DECIMAL BIT BASED
+    AUTOMATIC AUTO CONTROLLED DATA EDIT FILE KEYED LINE PAGE PRINT RECORD REWRITE SIGNED
+    UNSIGNED STREAM TITLE UNALIGNED ALIGNED CONDITION ERROR ENDFILE OFFSET AREA REFER
+    ABNORMAL ANY ASSIGNABLE BUFFERED DEFINED DIM DIMENSION FROM INTO INPUT OUTPUT UPDATE
+    SET KEY KEYFROM KEYTO IGNORE LABEL LOCAL NONVARYING NORMAL ORDINAL PARAMETER POSITION
+    REPLY RESERVED SYSTEM THREAD TASK WIDECHAR WX BX GX UTF8
+    ABS ADDR ADD BOOL CEIL DATE FLOOR HBOUND INDEX LBOUND LENGTH MAX MIN MOD NULL
+    ONCODE ONCHAR ONSOURCE ONLOC ROUND SQRT STRING SUBSTR SUM TIME TRANSLATE TRIM TRUNC
+    UNSPEC VERIFY CSTG CURRENTSTORAGE ALLOCATION SIZE
+""".split())
 
 
 class ISPFEditor:
@@ -321,6 +356,12 @@ class ISPFEditor:
         self.text.tag_configure("hexinfo", foreground="blue")
         self.text.tag_configure("compare_added", foreground="dark green")
         self.text.tag_configure("compare_removed", foreground="dark red")
+        # PL/I syntax colouring; lowest priority so found/compare/hex tags win
+        self._syntax_job = None
+        for tag, opts in SYNTAX_TAGS.items():
+            self.text.tag_configure(tag, **opts)
+            self.text.tag_lower(tag)
+        self.text.bind("<Destroy>", lambda e: self.cancel_syntax() if e.widget is self.text else None, add="+")
 
         # Scrollbars - gutter and text scroll together
         self.yscroll = tk.Scrollbar(self.main_frame, command=self.text.yview)
@@ -1167,11 +1208,56 @@ class ISPFEditor:
         if not self._processing:
             self._dirty = True
         self.text.edit_modified(False)
+        self._schedule_syntax()
         if self._processing:
             return
         gutter_lines = int(self.line_numbers.index("end-1c").split(".")[0])
         if gutter_lines != self._text_line_count():
             self.refresh_gutter(keep=self._get_pending_commands())
+
+    def _schedule_syntax(self):
+        """Re-colour shortly after the last change (debounced)."""
+        if self._syntax_job is not None:
+            self.root.after_cancel(self._syntax_job)
+        self._syntax_job = self.root.after(150, self._apply_syntax)
+
+    def cancel_syntax(self):
+        """Drop a pending re-colour (the editor is being closed)."""
+        if self._syntax_job is not None:
+            try:
+                self.root.after_cancel(self._syntax_job)
+            except tk.TclError:
+                pass
+            self._syntax_job = None
+
+    def _apply_syntax(self):
+        self._syntax_job = None
+        try:
+            if not self.text.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        content = self.text.get("1.0", "end-1c")
+        line_starts = [0]
+        for m in re.finditer("\n", content):
+            line_starts.append(m.end())
+
+        def index(offset):
+            line = bisect.bisect_right(line_starts, offset) - 1
+            return f"{line + 1}.{offset - line_starts[line]}"
+
+        ranges = {tag: [] for tag in SYNTAX_TAGS}
+        for m in PLI_TOKEN_RE.finditer(content):
+            tag = m.lastgroup
+            if tag == "syn_word":
+                if m.group().upper() not in PLI_KEYWORDS:
+                    continue
+                tag = "syn_keyword"
+            ranges[tag] += [index(m.start()), index(m.end())]
+        for tag, spans in ranges.items():
+            self.text.tag_remove(tag, "1.0", tk.END)
+            if spans:
+                self.text.tag_add(tag, *spans)
 
     def _on_text_yscroll(self, first, last):
         self.yscroll.set(first, last)
@@ -2550,6 +2636,7 @@ class ISPFEditor:
             if self._sync_hex_rows():
                 self.text.edit_reset()  # the hex rows are not an undoable change
                 self.text.mark_set(tk.INSERT, "1.0")
+            self._schedule_syntax()
             self.text.yview_moveto(0)
             self.cmd_entry.focus_set()
             self.update_status()
@@ -3418,6 +3505,7 @@ class EditorApp:
         if len(self.editors) <= 1:
             return False
         self.editors.remove(editor)
+        editor.cancel_syntax()
         self.notebook.forget(editor.frame)
         editor.frame.destroy()
         return True
